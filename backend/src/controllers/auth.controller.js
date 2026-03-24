@@ -31,19 +31,13 @@ const calculateAge = (dob) => {
 const generateInternalVoterId = () => {
   const year = new Date().getFullYear();
   const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+
   return `OVS-${year}-${randomPart}`;
 };
 
 export const sendOtp = asyncHandler(async (req, res) => {
-  const { mobileNumber, purpose = "register" } = req.body;
-
-  if (!mobileNumber) {
-    throw new ApiError(400, "Mobile number is required");
-  }
-
-  if (!/^[6-9]\d{9}$/.test(mobileNumber)) {
-    throw new ApiError(400, "Invalid mobile number");
-  }
+  const { body } = req.validatedData || { body: req.body };
+  const { mobileNumber, purpose = "register" } = body;
 
   await Otp.deleteMany({
     mobileNumber,
@@ -54,7 +48,7 @@ export const sendOtp = asyncHandler(async (req, res) => {
   const otp = generateOtp();
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-  const otpDoc = await Otp.create({
+  await Otp.create({
     mobileNumber,
     otp,
     purpose,
@@ -67,8 +61,6 @@ export const sendOtp = asyncHandler(async (req, res) => {
       {
         mobileNumber,
         purpose,
-        otp: otpDoc.otp,
-        expiresAt: otpDoc.expiresAt,
       },
       "OTP sent successfully",
     ),
@@ -76,6 +68,8 @@ export const sendOtp = asyncHandler(async (req, res) => {
 });
 
 export const verifyOtpAndRegister = asyncHandler(async (req, res) => {
+  const { body } = req.validatedData || { body: req.body };
+
   const {
     fullName,
     email,
@@ -87,11 +81,7 @@ export const verifyOtpAndRegister = asyncHandler(async (req, res) => {
     identityLast4,
     documentUrl,
     documentPublicId,
-  } = req.body;
-
-  if (!fullName || !email || !mobileNumber || !password || !dob || !otp) {
-    throw new ApiError(400, "All required fields must be provided");
-  }
+  } = body;
 
   const existingUser = await User.findOne({
     $or: [{ email }, { mobileNumber }],
@@ -121,13 +111,12 @@ export const verifyOtpAndRegister = asyncHandler(async (req, res) => {
 
   const age = calculateAge(dob);
   const isAdult = age >= 18;
-
   const internalVoterId = generateInternalVoterId();
 
   const user = await User.create({
-    fullName,
-    email,
-    mobileNumber,
+    fullName: fullName.trim(),
+    email: email.trim().toLowerCase(),
+    mobileNumber: mobileNumber.trim(),
     password,
     dob,
     mobileVerified: true,
@@ -164,11 +153,8 @@ export const verifyOtpAndRegister = asyncHandler(async (req, res) => {
 });
 
 export const loginUser = asyncHandler(async (req, res) => {
-  const { emailOrMobile, password } = req.body;
-
-  if (!emailOrMobile || !password) {
-    throw new ApiError(400, "Email/mobile and password are required");
-  }
+  const { body } = req.validatedData || { body: req.body };
+  const { emailOrMobile, password } = body;
 
   const user = await User.findOne({
     $or: [{ email: emailOrMobile }, { mobileNumber: emailOrMobile }],

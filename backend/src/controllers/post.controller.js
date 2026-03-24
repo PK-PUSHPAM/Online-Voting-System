@@ -9,12 +9,13 @@ import { buildPagination } from "../utils/pagination.util.js";
 import { buildPaginationResponse } from "../utils/paginationResponse.util.js";
 
 export const createPost = asyncHandler(async (req, res) => {
-  const { electionId } = req.params;
-  const { title, description, maxVotesPerVoter, isActive } = req.body;
+  const { body, params } = req.validatedData || {
+    body: req.body,
+    params: req.params,
+  };
 
-  if (!title) {
-    throw new ApiError(400, "Post title is required");
-  }
+  const { electionId } = params;
+  const { title, description, maxVotesPerVoter, isActive } = body;
 
   const election = await Election.findById(electionId);
 
@@ -22,7 +23,9 @@ export const createPost = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Election not found");
   }
 
-  if (election.status === "ended") {
+  const syncedElection = await syncElectionStatus(election);
+
+  if (syncedElection.status === "ended") {
     throw new ApiError(400, "Cannot add post to an ended election");
   }
 
@@ -55,12 +58,16 @@ export const createPost = asyncHandler(async (req, res) => {
 });
 
 export const getPostsByElection = asyncHandler(async (req, res) => {
-  const { electionId } = req.params;
+  const { params, query } = req.validatedData || {
+    params: req.params,
+    query: req.query,
+  };
 
-  const { page, limit, skip, sort } = buildPagination(req.query);
-  const { search } = req.query;
+  const { electionId } = params;
+  const { page, limit, skip, sort } = buildPagination(query);
+  const { search } = query;
 
-  const filter = { election: electionId };
+  const filter = { electionId };
 
   if (search) {
     filter.$or = [
@@ -92,11 +99,12 @@ export const getPostsByElection = asyncHandler(async (req, res) => {
 });
 
 export const getPostById = asyncHandler(async (req, res) => {
-  const { postId } = req.params;
+  const { params } = req.validatedData || { params: req.params };
+  const { postId } = params;
 
   const post = await Post.findById(postId).populate(
     "electionId",
-    "title status startDate endDate",
+    "title status startDate endDate isPublished",
   );
 
   if (!post) {
@@ -109,8 +117,13 @@ export const getPostById = asyncHandler(async (req, res) => {
 });
 
 export const updatePost = asyncHandler(async (req, res) => {
-  const { postId } = req.params;
-  const { title, description, maxVotesPerVoter, isActive } = req.body;
+  const { body, params } = req.validatedData || {
+    body: req.body,
+    params: req.params,
+  };
+
+  const { postId } = params;
+  const { title, description, maxVotesPerVoter, isActive } = body;
 
   const post = await Post.findById(postId);
 
@@ -124,7 +137,9 @@ export const updatePost = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Parent election not found");
   }
 
-  if (election.status === "ended") {
+  const syncedElection = await syncElectionStatus(election);
+
+  if (syncedElection.status === "ended") {
     throw new ApiError(400, "Cannot update post of an ended election");
   }
 
@@ -174,7 +189,8 @@ export const updatePost = asyncHandler(async (req, res) => {
 });
 
 export const deletePost = asyncHandler(async (req, res) => {
-  const { postId } = req.params;
+  const { params } = req.validatedData || { params: req.params };
+  const { postId } = params;
 
   const post = await Post.findById(postId);
 
@@ -188,11 +204,13 @@ export const deletePost = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Parent election not found");
   }
 
-  if (election.status === "active") {
+  const syncedElection = await syncElectionStatus(election);
+
+  if (syncedElection.status === "active") {
     throw new ApiError(400, "Cannot delete post from an active election");
   }
 
-  if (election.status === "ended") {
+  if (syncedElection.status === "ended") {
     throw new ApiError(400, "Cannot delete post from an ended election");
   }
 
@@ -205,7 +223,8 @@ export const deletePost = asyncHandler(async (req, res) => {
 
 export const getActivePostsWithCandidatesForElection = asyncHandler(
   async (req, res) => {
-    const { electionId } = req.params;
+    const { params } = req.validatedData || { params: req.params };
+    const { electionId } = params;
 
     let election = await Election.findById(electionId);
 

@@ -78,11 +78,10 @@ export const createCandidate = asyncHandler(async (req, res) => {
 
 export const getCandidatesByPost = asyncHandler(async (req, res) => {
   const { postId } = req.params;
-
   const { page, limit, skip, sort } = buildPagination(req.query);
   const { search } = req.query;
 
-  const filter = { post: postId };
+  const filter = { postId };
 
   if (search) {
     filter.$or = [
@@ -93,7 +92,12 @@ export const getCandidatesByPost = asyncHandler(async (req, res) => {
 
   const [totalItems, candidates] = await Promise.all([
     Candidate.countDocuments(filter),
-    Candidate.find(filter).sort(sort).skip(skip).limit(limit),
+    Candidate.find(filter)
+      .populate("postId", "title description")
+      .populate("electionId", "title status")
+      .sort(sort)
+      .skip(skip)
+      .limit(limit),
   ]);
 
   const pagination = buildPaginationResponse({
@@ -115,11 +119,10 @@ export const getCandidatesByPost = asyncHandler(async (req, res) => {
 
 export const getCandidatesByElection = asyncHandler(async (req, res) => {
   const { electionId } = req.params;
-
   const { page, limit, skip, sort } = buildPagination(req.query);
   const { search } = req.query;
 
-  const filter = { election: electionId };
+  const filter = { electionId };
 
   if (search) {
     filter.$or = [
@@ -130,7 +133,12 @@ export const getCandidatesByElection = asyncHandler(async (req, res) => {
 
   const [totalItems, candidates] = await Promise.all([
     Candidate.countDocuments(filter),
-    Candidate.find(filter).sort(sort).skip(skip).limit(limit),
+    Candidate.find(filter)
+      .populate("postId", "title description")
+      .populate("electionId", "title status")
+      .sort(sort)
+      .skip(skip)
+      .limit(limit),
   ]);
 
   const pagination = buildPaginationResponse({
@@ -267,10 +275,6 @@ export const deleteCandidate = asyncHandler(async (req, res) => {
 
   if (!election) {
     throw new ApiError(404, "Parent election not found");
-  }
-
-  if (election.status === "active") {
-    throw new ApiError(400, "Cannot delete candidate from an active election");
   }
 
   if (election.status === "ended") {

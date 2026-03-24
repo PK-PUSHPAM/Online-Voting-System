@@ -13,17 +13,8 @@ const countActiveSuperAdmins = async () => {
 };
 
 export const createAdmin = asyncHandler(async (req, res) => {
-  const { fullName, email, mobileNumber, password, dob, role } = req.body;
-
-  if (!fullName || !email || !mobileNumber || !password || !dob) {
-    throw new ApiError(400, "All required fields must be provided");
-  }
-
-  const allowedRoles = ["admin", "super_admin"];
-
-  if (role && !allowedRoles.includes(role)) {
-    throw new ApiError(400, "Invalid role for admin creation");
-  }
+  const { body } = req.validatedData || { body: req.body };
+  const { fullName, email, mobileNumber, password, dob, role } = body;
 
   const existingUser = await User.findOne({
     $or: [{ email }, { mobileNumber }],
@@ -66,8 +57,13 @@ export const createAdmin = asyncHandler(async (req, res) => {
 });
 
 export const updateAdminStatus = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
-  const { isActive } = req.body;
+  const { body, params } = req.validatedData || {
+    body: req.body,
+    params: req.params,
+  };
+
+  const { userId } = params;
+  const { isActive } = body;
 
   const user = await User.findById(userId);
 
@@ -87,7 +83,7 @@ export const updateAdminStatus = asyncHandler(async (req, res) => {
     }
   }
 
-  user.isActive = Boolean(isActive);
+  user.isActive = isActive;
   await user.save({ validateBeforeSave: false });
 
   const updatedUser = await User.findById(user._id).select(
@@ -106,12 +102,13 @@ export const updateAdminStatus = asyncHandler(async (req, res) => {
 });
 
 export const changeAdminRole = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
-  const { role } = req.body;
+  const { body, params } = req.validatedData || {
+    body: req.body,
+    params: req.params,
+  };
 
-  if (!["admin", "super_admin"].includes(role)) {
-    throw new ApiError(400, "Invalid role");
-  }
+  const { userId } = params;
+  const { role } = body;
 
   const user = await User.findById(userId);
 
@@ -146,17 +143,16 @@ export const changeAdminRole = asyncHandler(async (req, res) => {
 });
 
 export const getAllAdmins = asyncHandler(async (req, res) => {
-  const { page, limit, skip, sort } = buildPagination(req.query);
-  const { search, role, isActive } = req.query;
+  const { query } = req.validatedData || { query: req.query };
+  const { page, limit, skip, sort } = buildPagination(query);
+  const { search, role, isActive } = query;
 
-  // 🔥 FIX: Only admins allowed
   const filter = {
     role: { $in: ["admin", "super_admin"] },
   };
 
-  // optional filters
   if (role) {
-    filter.role = role; // override if specific role needed
+    filter.role = role;
   }
 
   if (isActive !== undefined) {
@@ -167,6 +163,7 @@ export const getAllAdmins = asyncHandler(async (req, res) => {
     filter.$or = [
       { fullName: { $regex: search, $options: "i" } },
       { email: { $regex: search, $options: "i" } },
+      { mobileNumber: { $regex: search, $options: "i" } },
     ];
   }
 

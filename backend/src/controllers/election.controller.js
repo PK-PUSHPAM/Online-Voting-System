@@ -23,7 +23,7 @@ export const createElection = asyncHandler(async (req, res) => {
   const start = new Date(startDate);
   const end = new Date(endDate);
 
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
     throw new ApiError(400, "Invalid date format");
   }
 
@@ -50,24 +50,25 @@ export const createElection = asyncHandler(async (req, res) => {
     allowedVoterType: allowedVoterType || "verifiedOnly",
   });
 
+  const syncedElection = await syncElectionStatus(election);
+
   return res
     .status(201)
-    .json(new ApiResponse(201, election, "Election created successfully"));
+    .json(
+      new ApiResponse(201, syncedElection, "Election created successfully"),
+    );
 });
 
 export const getAllElections = asyncHandler(async (req, res) => {
   const { page, limit, skip, sort } = buildPagination(req.query);
-
   const { status, search } = req.query;
 
   const filter = {};
 
-  // 🔹 Status filter
   if (status) {
     filter.status = status;
   }
 
-  // 🔹 Search filter (title / description)
   if (search) {
     filter.$or = [
       { title: { $regex: search, $options: "i" } },
@@ -80,6 +81,10 @@ export const getAllElections = asyncHandler(async (req, res) => {
     Election.find(filter).sort(sort).skip(skip).limit(limit),
   ]);
 
+  const syncedItems = await Promise.all(
+    elections.map(async (election) => await syncElectionStatus(election)),
+  );
+
   const pagination = buildPaginationResponse({
     totalItems,
     page,
@@ -90,7 +95,7 @@ export const getAllElections = asyncHandler(async (req, res) => {
     new ApiResponse(
       200,
       {
-        items: elections,
+        items: syncedItems,
         pagination,
       },
       "Elections fetched successfully",
@@ -101,7 +106,7 @@ export const getAllElections = asyncHandler(async (req, res) => {
 export const getElectionById = asyncHandler(async (req, res) => {
   const { electionId } = req.params;
 
-  const election = await Election.findById(electionId).populate(
+  let election = await Election.findById(electionId).populate(
     "createdBy",
     "fullName email role",
   );
@@ -109,6 +114,8 @@ export const getElectionById = asyncHandler(async (req, res) => {
   if (!election) {
     throw new ApiError(404, "Election not found");
   }
+
+  election = await syncElectionStatus(election);
 
   return res
     .status(200)
@@ -135,7 +142,10 @@ export const updateElection = asyncHandler(async (req, res) => {
   const updatedStartDate = startDate ? new Date(startDate) : election.startDate;
   const updatedEndDate = endDate ? new Date(endDate) : election.endDate;
 
-  if (isNaN(updatedStartDate.getTime()) || isNaN(updatedEndDate.getTime())) {
+  if (
+    Number.isNaN(updatedStartDate.getTime()) ||
+    Number.isNaN(updatedEndDate.getTime())
+  ) {
     throw new ApiError(400, "Invalid date format");
   }
 
@@ -167,9 +177,13 @@ export const updateElection = asyncHandler(async (req, res) => {
 
   await election.save();
 
+  const syncedElection = await syncElectionStatus(election);
+
   return res
     .status(200)
-    .json(new ApiResponse(200, election, "Election updated successfully"));
+    .json(
+      new ApiResponse(200, syncedElection, "Election updated successfully"),
+    );
 });
 
 export const deleteElection = asyncHandler(async (req, res) => {

@@ -6,12 +6,13 @@ import { buildPagination } from "../utils/pagination.util.js";
 import { buildPaginationResponse } from "../utils/paginationResponse.util.js";
 
 export const getPendingVoters = asyncHandler(async (req, res) => {
-  const { page, limit, skip, sort } = buildPagination(req.query);
-  const { search } = req.query;
+  const { query } = req.validatedData || { query: req.query };
+  const { page, limit, skip, sort } = buildPagination(query);
+  const { search } = query;
 
   const filter = {
     role: "voter",
-    isVerified: false,
+    verificationStatus: "pending",
   };
 
   if (search) {
@@ -19,6 +20,7 @@ export const getPendingVoters = asyncHandler(async (req, res) => {
       { fullName: { $regex: search, $options: "i" } },
       { email: { $regex: search, $options: "i" } },
       { mobileNumber: { $regex: search, $options: "i" } },
+      { internalVoterId: { $regex: search, $options: "i" } },
     ];
   }
 
@@ -49,7 +51,8 @@ export const getPendingVoters = asyncHandler(async (req, res) => {
 });
 
 export const approveVoter = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
+  const { params } = req.validatedData || { params: req.params };
+  const { userId } = params;
 
   const voter = await User.findById(userId);
 
@@ -82,7 +85,8 @@ export const approveVoter = asyncHandler(async (req, res) => {
 });
 
 export const rejectVoter = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
+  const { params } = req.validatedData || { params: req.params };
+  const { userId } = params;
 
   const voter = await User.findById(userId);
 

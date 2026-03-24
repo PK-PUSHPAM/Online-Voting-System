@@ -18,11 +18,9 @@ import {
 const router = express.Router();
 
 router.post("/send-otp", validate(sendOtpSchema), sendOtp);
-router.post("/register", validate(registerSchema), registerUser);
+router.post("/register", validate(registerSchema), verifyOtpAndRegister);
 router.post("/login", validate(loginSchema), loginUser);
-
 router.post("/refresh-token", refreshAccessToken);
-
 router.post("/logout", verifyJWT, logoutUser);
 router.get("/me", verifyJWT, getCurrentUser);
 

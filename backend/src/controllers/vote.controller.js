@@ -7,14 +7,13 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import syncElectionStatus from "../utils/syncElectionStatus.js";
+import { buildPagination } from "../utils/pagination.util.js";
+import { buildPaginationResponse } from "../utils/paginationResponse.util.js";
 
 export const castVote = asyncHandler(async (req, res) => {
   const voterId = req.user._id;
-  const { electionId, postId, candidateId } = req.body;
-
-  if (!electionId || !postId || !candidateId) {
-    throw new ApiError(400, "electionId, postId and candidateId are required");
-  }
+  const { body } = req.validatedData || { body: req.body };
+  const { electionId, postId, candidateId } = body;
 
   const voter = await User.findById(voterId);
 
@@ -90,54 +89,70 @@ export const castVote = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Candidate is not approved for voting");
   }
 
-  const existingVote = await Vote.findOne({
-    voterId,
-    electionId,
-    postId,
-  });
+  try {
+    const vote = await Vote.create({
+      voterId,
+      electionId,
+      postId,
+      candidateId,
+    });
 
-  if (existingVote) {
-    throw new ApiError(
-      409,
-      "You have already voted for this post in this election",
-    );
+    return res
+      .status(201)
+      .json(new ApiResponse(201, vote, "Vote cast successfully"));
+  } catch (error) {
+    if (error?.code === 11000) {
+      throw new ApiError(
+        409,
+        "You have already voted for this post in this election",
+      );
+    }
+
+    throw error;
   }
-
-  const vote = await Vote.create({
-    voterId,
-    electionId,
-    postId,
-    candidateId,
-  });
-
-  return res
-    .status(201)
-    .json(new ApiResponse(201, vote, "Vote cast successfully"));
 });
 
 export const getMyVotes = asyncHandler(async (req, res) => {
   const voterId = req.user._id;
+  const { query } = req.validatedData || { query: req.query };
+  const { page, limit, skip, sort } = buildPagination(query);
 
-  const votes = await Vote.find({ voterId })
-    .populate("electionId", "title status startDate endDate")
-    .populate("postId", "title description")
-    .populate("candidateId", "fullName partyName candidatePhotoUrl")
-    .sort({ createdAt: -1 });
+  const [totalItems, votes] = await Promise.all([
+    Vote.countDocuments({ voterId }),
+    Vote.find({ voterId })
+      .populate("electionId", "title status startDate endDate")
+      .populate("postId", "title description")
+      .populate("candidateId", "fullName partyName candidatePhotoUrl")
+      .sort(sort)
+      .skip(skip)
+      .limit(limit),
+  ]);
 
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        count: votes.length,
-        votes,
-      },
-      "Your votes fetched successfully",
-    ),
-  );
+  const pagination = buildPaginationResponse({
+    totalItems,
+    page,
+    limit,
+  });
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { items: votes, pagination },
+        "Your votes fetched successfully",
+      ),
+    );
 });
 
 export const getVotesByElectionForAdmin = asyncHandler(async (req, res) => {
-  const { electionId } = req.params;
+  const { params, query } = req.validatedData || {
+    params: req.params,
+    query: req.query,
+  };
+
+  const { electionId } = params;
+  const { page, limit, skip, sort } = buildPagination(query);
 
   const election = await Election.findById(electionId);
 
@@ -145,20 +160,30 @@ export const getVotesByElectionForAdmin = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Election not found");
   }
 
-  const votes = await Vote.find({ electionId })
-    .populate("voterId", "fullName email mobileNumber internalVoterId")
-    .populate("postId", "title")
-    .populate("candidateId", "fullName partyName")
-    .sort({ createdAt: -1 });
+  const [totalItems, votes] = await Promise.all([
+    Vote.countDocuments({ electionId }),
+    Vote.find({ electionId })
+      .populate("voterId", "fullName email mobileNumber internalVoterId")
+      .populate("postId", "title")
+      .populate("candidateId", "fullName partyName")
+      .sort(sort)
+      .skip(skip)
+      .limit(limit),
+  ]);
 
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        count: votes.length,
-        votes,
-      },
-      "Election votes fetched successfully",
-    ),
-  );
+  const pagination = buildPaginationResponse({
+    totalItems,
+    page,
+    limit,
+  });
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { items: votes, pagination },
+        "Election votes fetched successfully",
+      ),
+    );
 });
