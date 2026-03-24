@@ -13,6 +13,7 @@ import postRoutes from "./routes/post.routes.js";
 import candidateRoutes from "./routes/candidate.routes.js";
 import voteRoutes from "./routes/vote.routes.js";
 import resultRoutes from "./routes/result.routes.js";
+import uploadRoutes from "./routes/upload.routes.js";
 
 import notFoundHandler from "./middleware/notFound.middleware.js";
 import errorHandler from "./middleware/error.middleware.js";
@@ -74,6 +75,7 @@ app.use("/api/v1/posts", postRoutes);
 app.use("/api/v1/candidates", candidateRoutes);
 app.use("/api/v1/votes", voteRoutes);
 app.use("/api/v1/results", resultRoutes);
+app.use("/api/v1/uploads", uploadRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

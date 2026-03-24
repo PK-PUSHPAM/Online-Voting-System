@@ -9,7 +9,7 @@ import ApiResponse from "../utils/ApiResponse.js";
 import {
   accessTokenCookieOptions,
   refreshTokenCookieOptions,
-} from "../constants/cookieOptions.js";
+} from "../constants/cookieOptions.constants.js";
 
 const calculateAge = (dob) => {
   const birthDate = new Date(dob);
