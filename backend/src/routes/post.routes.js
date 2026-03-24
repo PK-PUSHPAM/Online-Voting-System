@@ -2,56 +2,55 @@ import express from "express";
 import verifyJWT from "../middleware/auth.middleware.js";
 import authorizeRoles from "../middleware/role.middleware.js";
 import {
-  createElection,
-  getAllElections,
-  getElectionById,
-  updateElection,
-  deleteElection,
-  getActivePublishedElectionsForVoter,
-} from "../controllers/election.controller.js";
+  createPost,
+  getPostsByElection,
+  getPostById,
+  updatePost,
+  deletePost,
+  getActivePostsWithCandidatesForElection,
+} from "../controllers/post.controller.js";
 
 const router = express.Router();
 
 router.post(
-  "/create",
+  "/create/:electionId",
   verifyJWT,
   authorizeRoles("admin", "super_admin"),
-  createElection,
+  createPost,
 );
 
 router.get(
-  "/all",
+  "/election/:electionId",
   verifyJWT,
   authorizeRoles("admin", "super_admin"),
-  getAllElections,
+  getPostsByElection,
 );
 
 router.get(
-  "/:electionId",
+  "/:postId",
   verifyJWT,
   authorizeRoles("admin", "super_admin"),
-  getElectionById,
+  getPostById,
 );
 
 router.patch(
-  "/update/:electionId",
+  "/update/:postId",
   verifyJWT,
   authorizeRoles("admin", "super_admin"),
-  updateElection,
+  updatePost,
 );
 
 router.delete(
-  "/delete/:electionId",
+  "/delete/:postId",
   verifyJWT,
   authorizeRoles("admin", "super_admin"),
-  deleteElection,
+  deletePost,
 );
 
 router.get(
-  "/voter/active",
+  "/voter/election/:electionId",
   verifyJWT,
   authorizeRoles("voter"),
-  getActivePublishedElectionsForVoter,
+  getActivePostsWithCandidatesForElection,
 );
-
 export default router;

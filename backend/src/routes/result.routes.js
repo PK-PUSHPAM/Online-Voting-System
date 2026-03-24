@@ -1,34 +1,25 @@
 import express from "express";
-import {
-  getPendingVoters,
-  approveVoter,
-  rejectVoter,
-} from "../controllers/user.controller.js";
-
 import verifyJWT from "../middleware/auth.middleware.js";
 import authorizeRoles from "../middleware/role.middleware.js";
+import {
+  getElectionResultsForAdmin,
+  getPostResultForAdmin,
+} from "../controllers/result.controller.js";
 
 const router = express.Router();
 
 router.get(
-  "/pending-voters",
+  "/election/:electionId",
   verifyJWT,
   authorizeRoles("admin", "super_admin"),
-  getPendingVoters,
+  getElectionResultsForAdmin,
 );
 
-router.patch(
-  "/approve/:userId",
+router.get(
+  "/election/:electionId/post/:postId",
   verifyJWT,
   authorizeRoles("admin", "super_admin"),
-  approveVoter,
-);
-
-router.patch(
-  "/reject/:userId",
-  verifyJWT,
-  authorizeRoles("admin", "super_admin"),
-  rejectVoter,
+  getPostResultForAdmin,
 );
 
 export default router;

@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon  src/server.js"
+    "dev": "nodemon  src/server.js",
+    "seed:admin": "node src/seeds/admin.seed.js"
   },
   "author": "pushpam kumar sharma",
   "license": "ISC",
@@ -19,6 +20,9 @@
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.3.1",
+    "helmet": "^8.1.0",
+    "hpp": "^0.2.3",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.3.2"
   }
