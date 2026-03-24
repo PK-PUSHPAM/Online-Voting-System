@@ -191,7 +191,7 @@ export const getActivePostsWithCandidatesForElection = asyncHandler(
   async (req, res) => {
     const { electionId } = req.params;
 
-    const election = await Election.findById(electionId);
+    let election = await Election.findById(electionId);
 
     if (!election) {
       throw new ApiError(404, "Election not found");

@@ -42,7 +42,7 @@ export const castVote = asyncHandler(async (req, res) => {
     throw new ApiError(403, "You are not eligible to vote");
   }
 
-  const election = await Election.findById(electionId);
+  let election = await Election.findById(electionId);
 
   if (!election) {
     throw new ApiError(404, "Election not found");
