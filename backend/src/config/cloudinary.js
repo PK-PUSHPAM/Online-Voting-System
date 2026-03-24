@@ -6,7 +6,6 @@ const requiredCloudinaryEnvVars = [
   "CLOUDINARY_API_SECRET",
 ];
 
-// Validate and configure Cloudinary when first accessed
 let isConfigured = false;
 
 const configureCloudinary = () => {
@@ -32,7 +31,10 @@ const configureCloudinary = () => {
   isConfigured = true;
 };
 
-// Configure on first use
-configureCloudinary();
+// Lazy initialization wrapper
+export const getCloudinary = () => {
+  configureCloudinary();
+  return cloudinary;
+};
 
 export default cloudinary;

@@ -5,6 +5,7 @@ export const accessTokenCookieOptions = {
   secure: isProduction,
   sameSite: isProduction ? "none" : "lax",
   maxAge: 24 * 60 * 60 * 1000,
+  path: "/",
 };
 
 export const refreshTokenCookieOptions = {
@@ -12,4 +13,5 @@ export const refreshTokenCookieOptions = {
   secure: isProduction,
   sameSite: isProduction ? "none" : "lax",
   maxAge: 7 * 24 * 60 * 60 * 1000,
+  path: "/",
 };

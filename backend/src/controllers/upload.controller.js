@@ -7,13 +7,30 @@ import {
 } from "../utils/cloudinary.util.js";
 import { CLOUDINARY_FOLDERS } from "../constants/upload.constants.js";
 
+const sanitizePublicId = (value = "") => value.trim();
+
+const validateOldPublicIdBelongsToFolder = (publicId, folder) => {
+  if (!publicId) return;
+
+  if (!publicId.startsWith(`${folder}/`)) {
+    throw new ApiError(
+      400,
+      "Invalid oldPublicId for the requested upload type",
+    );
+  }
+};
+
 export const uploadCandidatePhotoToCloudinary = asyncHandler(
   async (req, res) => {
     if (!req.file) {
       throw new ApiError(400, "Candidate photo file is required");
     }
 
-    const oldPublicId = req.body?.oldPublicId?.trim() || "";
+    const oldPublicId = sanitizePublicId(req.body?.oldPublicId);
+    validateOldPublicIdBelongsToFolder(
+      oldPublicId,
+      CLOUDINARY_FOLDERS.candidatePhotos,
+    );
 
     const uploadedFile = await uploadOnCloudinary(req.file.path, {
       folder: CLOUDINARY_FOLDERS.candidatePhotos,
@@ -28,7 +45,9 @@ export const uploadCandidatePhotoToCloudinary = asyncHandler(
       try {
         await deleteFromCloudinary(oldPublicId, { resourceType: "image" });
       } catch (error) {
-        // don't fail successful new upload just because old cleanup failed
+        console.warn(
+          `Failed to delete old candidate photo ${oldPublicId}: ${error.message}`,
+        );
       }
     }
 
@@ -42,6 +61,7 @@ export const uploadCandidatePhotoToCloudinary = asyncHandler(
           bytes: uploadedFile.bytes,
           format: uploadedFile.format,
           resourceType: uploadedFile.resource_type,
+          uploadedAt: new Date().toISOString(),
         },
         "Candidate photo uploaded successfully",
       ),
@@ -55,13 +75,18 @@ export const uploadVoterDocumentToCloudinary = asyncHandler(
       throw new ApiError(400, "Voter document file is required");
     }
 
-    const oldPublicId = req.body?.oldPublicId?.trim() || "";
+    const oldPublicId = sanitizePublicId(req.body?.oldPublicId);
+    validateOldPublicIdBelongsToFolder(
+      oldPublicId,
+      CLOUDINARY_FOLDERS.voterDocuments,
+    );
 
     const isPdf = req.file.mimetype === "application/pdf";
+    const resourceType = isPdf ? "raw" : "image";
 
     const uploadedFile = await uploadOnCloudinary(req.file.path, {
       folder: CLOUDINARY_FOLDERS.voterDocuments,
-      resourceType: isPdf ? "raw" : "image",
+      resourceType,
     });
 
     if (!uploadedFile?.secure_url || !uploadedFile?.public_id) {
@@ -70,11 +95,17 @@ export const uploadVoterDocumentToCloudinary = asyncHandler(
 
     if (oldPublicId && oldPublicId !== uploadedFile.public_id) {
       try {
+        const oldResourceType = oldPublicId.toLowerCase().endsWith(".pdf")
+          ? "raw"
+          : "image";
+
         await deleteFromCloudinary(oldPublicId, {
-          resourceType: isPdf ? "raw" : "image",
+          resourceType: oldResourceType,
         });
       } catch (error) {
-        // don't fail successful new upload just because old cleanup failed
+        console.warn(
+          `Failed to delete old voter document ${oldPublicId}: ${error.message}`,
+        );
       }
     }
 
@@ -88,6 +119,7 @@ export const uploadVoterDocumentToCloudinary = asyncHandler(
           bytes: uploadedFile.bytes,
           format: uploadedFile.format || null,
           resourceType: uploadedFile.resource_type,
+          uploadedAt: new Date().toISOString(),
         },
         "Voter document uploaded successfully",
       ),

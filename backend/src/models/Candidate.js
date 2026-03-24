@@ -6,12 +6,23 @@ const candidateSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Election",
       required: true,
+      immutable: true,
+      index: true,
     },
 
     postId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Post",
       required: true,
+      immutable: true,
+      index: true,
+    },
+
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
     },
 
     fullName: {
@@ -20,38 +31,7 @@ const candidateSchema = new mongoose.Schema(
       trim: true,
     },
 
-    email: {
-      type: String,
-      trim: true,
-      lowercase: true,
-      default: "",
-    },
-
-    mobileNumber: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-
     partyName: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-
-    partySymbolUrl: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-
-    candidatePhotoUrl: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-
-    photoPublicId: {
       type: String,
       trim: true,
       default: "",
@@ -63,15 +43,58 @@ const candidateSchema = new mongoose.Schema(
       default: "",
     },
 
-    isApproved: {
-      type: Boolean,
-      default: true,
+    candidatePhotoUrl: {
+      type: String,
+      trim: true,
+      default: "",
     },
 
-    addedBy: {
+    candidatePhotoPublicId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    isApproved: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+      index: true,
+    },
+
+    approvedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null,
+    },
+
+    approvedAt: {
+      type: Date,
+      default: null,
+    },
+
+    rejectionReason: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    displayOrder: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true,
     },
   },
   { timestamps: true },
@@ -81,6 +104,19 @@ candidateSchema.index(
   { electionId: 1, postId: 1, fullName: 1 },
   { unique: true },
 );
+candidateSchema.index(
+  { electionId: 1, postId: 1, userId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { userId: { $type: "objectId" } },
+  },
+);
+candidateSchema.index({
+  electionId: 1,
+  postId: 1,
+  approvalStatus: 1,
+  displayOrder: 1,
+});
 
 const Candidate = mongoose.model("Candidate", candidateSchema);
 

@@ -50,6 +50,7 @@ export const getAllElectionsSchema = z.object({
   params: emptyObjectSchema,
   query: paginationQuerySchema.extend({
     status: z.enum(["upcoming", "active", "ended"]).optional(),
+    search: z.string().trim().optional(),
   }),
 });
 

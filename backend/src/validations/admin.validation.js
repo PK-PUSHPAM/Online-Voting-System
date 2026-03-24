@@ -12,16 +12,34 @@ const mobileNumberSchema = z
 
 const emailSchema = z.string().trim().email("Invalid email");
 
+const passwordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters long")
+  .max(64, "Password must not exceed 64 characters")
+  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+  .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+  .regex(/\d/, "Password must contain at least one number")
+  .regex(
+    /[!@#$%^&*()_\-+={[}\]|\\:;"'<>,.?/~`]/,
+    "Password must contain at least one special character",
+  );
+
+const dateStringSchema = z
+  .string()
+  .trim()
+  .refine((value) => !Number.isNaN(new Date(value).getTime()), "Invalid date");
+
 export const createAdminSchema = z.object({
   body: z.object({
     fullName: z
       .string()
       .trim()
-      .min(3, "Full name must be at least 3 characters long"),
+      .min(3, "Full name must be at least 3 characters long")
+      .max(100, "Full name must not exceed 100 characters"),
     email: emailSchema,
     mobileNumber: mobileNumberSchema,
-    password: z.string().min(6, "Password must be at least 6 characters long"),
-    dob: z.string().trim().min(1, "Date of birth is required"),
+    password: passwordSchema,
+    dob: dateStringSchema,
     role: z.enum(["admin", "super_admin"]).optional().default("admin"),
   }),
   params: emptyObjectSchema,
@@ -59,5 +77,31 @@ export const getAllAdminsSchema = z.object({
   query: paginationQuerySchema.extend({
     role: z.enum(["admin", "super_admin"]).optional(),
     isActive: z.enum(["true", "false"]).optional(),
+    search: z.string().trim().optional(),
   }),
+});
+
+export const getAuditLogsSchema = z.object({
+  body: emptyObjectSchema,
+  params: emptyObjectSchema,
+  query: paginationQuerySchema.extend({
+    action: z.string().trim().optional(),
+    status: z.enum(["success", "failure"]).optional(),
+    actorRole: z
+      .enum(["super_admin", "admin", "voter", "system", "unknown"])
+      .optional(),
+    targetType: z.string().trim().optional(),
+    actorId: mongoIdSchema("actorId").optional(),
+    targetId: mongoIdSchema("targetId").optional(),
+    search: z.string().trim().optional(),
+    startDate: dateStringSchema.optional(),
+    endDate: dateStringSchema.optional(),
+    sortOrder: z.enum(["asc", "desc"]).optional(),
+  }),
+});
+
+export const getDashboardSummarySchema = z.object({
+  body: emptyObjectSchema,
+  params: emptyObjectSchema,
+  query: emptyObjectSchema,
 });

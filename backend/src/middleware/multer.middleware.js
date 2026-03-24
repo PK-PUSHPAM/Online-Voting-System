@@ -15,17 +15,27 @@ if (!fs.existsSync(tempUploadDir)) {
   fs.mkdirSync(tempUploadDir, { recursive: true });
 }
 
+const sanitizeFileName = (fileName) => {
+  const ext = path.extname(fileName).toLowerCase();
+  const baseName = path.basename(fileName, ext);
+
+  const safeBaseName = baseName
+    .replace(/\s+/g, "-")
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .slice(0, 60);
+
+  return `${safeBaseName || "file"}${ext}`;
+};
+
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
+  destination(req, file, cb) {
     cb(null, tempUploadDir);
   },
-  filename: function (req, file, cb) {
-    const sanitizedOriginalName = file.originalname
-      .replace(/\s+/g, "-")
-      .replace(/[^a-zA-Z0-9._-]/g, "");
-
+  filename(req, file, cb) {
+    const safeName = sanitizeFileName(file.originalname);
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `${uniqueSuffix}-${sanitizedOriginalName}`);
+
+    cb(null, `${uniqueSuffix}-${safeName}`);
   },
 });
 
@@ -38,6 +48,10 @@ const createFileFilter = (allowedMimeTypes, fileLabel) => {
           `Invalid ${fileLabel} file type. Allowed types: ${allowedMimeTypes.join(", ")}`,
         ),
       );
+    }
+
+    if (!file.originalname || file.originalname.length > 200) {
+      return cb(new ApiError(400, `Invalid ${fileLabel} file name`));
     }
 
     cb(null, true);
@@ -55,16 +69,37 @@ const createUploader = ({ allowedMimeTypes, maxFileSize, fileLabel }) => {
   });
 };
 
-const handleMulterError = (uploader) => {
+const cleanupUploadedTempFile = (req) => {
+  try {
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+  } catch (error) {
+    console.warn(`Failed to cleanup temp upload file: ${error.message}`);
+  }
+};
+
+const handleMulterError = (uploader, maxFileSize) => {
   return (req, res, next) => {
     uploader(req, res, (err) => {
       if (!err) return next();
 
+      cleanupUploadedTempFile(req);
+
       if (err instanceof multer.MulterError) {
         if (err.code === "LIMIT_FILE_SIZE") {
           return next(
-            new ApiError(400, `File too large. Maximum allowed size exceeded.`),
+            new ApiError(
+              400,
+              `File too large. Maximum allowed size is ${Math.ceil(
+                maxFileSize / (1024 * 1024),
+              )} MB.`,
+            ),
           );
+        }
+
+        if (err.code === "LIMIT_UNEXPECTED_FILE") {
+          return next(new ApiError(400, "Unexpected file field received"));
         }
 
         return next(new ApiError(400, err.message));
@@ -81,6 +116,7 @@ export const uploadCandidatePhoto = handleMulterError(
     maxFileSize: MAX_CANDIDATE_PHOTO_SIZE,
     fileLabel: "candidate photo",
   }).single("candidatePhoto"),
+  MAX_CANDIDATE_PHOTO_SIZE,
 );
 
 export const uploadVoterDocument = handleMulterError(
@@ -89,4 +125,5 @@ export const uploadVoterDocument = handleMulterError(
     maxFileSize: MAX_VOTER_DOCUMENT_SIZE,
     fileLabel: "voter document",
   }).single("document"),
+  MAX_VOTER_DOCUMENT_SIZE,
 );

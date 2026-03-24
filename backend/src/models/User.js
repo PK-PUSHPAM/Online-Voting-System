@@ -28,13 +28,14 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
-      minlength: 6,
+      minlength: 8,
     },
 
     role: {
       type: String,
       enum: ["super_admin", "admin", "voter"],
       default: "voter",
+      index: true,
     },
 
     dob: {
@@ -45,22 +46,40 @@ const userSchema = new mongoose.Schema(
     ageVerified: {
       type: Boolean,
       default: false,
+      index: true,
     },
 
     mobileVerified: {
       type: Boolean,
       default: false,
+      index: true,
     },
 
     verificationStatus: {
       type: String,
       enum: ["pending", "approved", "rejected"],
       default: "pending",
+      index: true,
+    },
+
+    verificationRejectionReason: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 500,
+    },
+
+    verificationNotes: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 1000,
     },
 
     isEligibleToVote: {
       type: Boolean,
       default: false,
+      index: true,
     },
 
     internalVoterId: {
@@ -68,6 +87,7 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
       trim: true,
+      index: true,
     },
 
     identityType: {
@@ -98,34 +118,48 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
+      index: true,
     },
 
     verifiedAt: {
       type: Date,
       default: null,
+      index: true,
     },
 
     refreshToken: {
       type: String,
       default: "",
+      select: false,
     },
 
     isActive: {
       type: Boolean,
       default: true,
+      index: true,
     },
   },
   { timestamps: true },
 );
 
-userSchema.pre("save", async function () {
-  if (!this.isModified("password")) return;
+userSchema.index({ role: 1, verificationStatus: 1, createdAt: -1 });
+userSchema.index({ role: 1, isActive: 1, createdAt: -1 });
 
-  this.password = await bcrypt.hash(this.password, 10);
+userSchema.pre("save", async function (next) {
+  try {
+    if (!this.isModified("password")) {
+      return next();
+    }
+
+    this.password = await bcrypt.hash(this.password, 12);
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 userSchema.methods.isPasswordCorrect = async function (password) {
-  return await bcrypt.compare(password, this.password);
+  return bcrypt.compare(password, this.password);
 };
 
 userSchema.methods.generateAccessToken = function () {

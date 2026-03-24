@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import cloudinary from "../config/cloudinary.js";
+import { getCloudinary } from "../config/cloudinary.js";
 import ApiError from "./ApiError.js";
 
 const removeLocalFile = async (localFilePath) => {
@@ -26,6 +26,7 @@ export const uploadOnCloudinary = async (
   }
 
   try {
+    const cloudinary = getCloudinary();
     const uploadResponse = await cloudinary.uploader.upload(localFilePath, {
       folder,
       resource_type: resourceType,
@@ -53,6 +54,7 @@ export const deleteFromCloudinary = async (
   if (!publicId) return null;
 
   try {
+    const cloudinary = getCloudinary();
     const response = await cloudinary.uploader.destroy(publicId, {
       resource_type: resourceType,
       invalidate: true,
