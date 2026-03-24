@@ -5,6 +5,8 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import syncElectionStatus from "../utils/syncElectionStatus.js";
+import { buildPagination } from "../utils/pagination.util.js";
+import { buildPaginationResponse } from "../utils/paginationResponse.util.js";
 
 export const createPost = asyncHandler(async (req, res) => {
   const { electionId } = req.params;
@@ -55,24 +57,38 @@ export const createPost = asyncHandler(async (req, res) => {
 export const getPostsByElection = asyncHandler(async (req, res) => {
   const { electionId } = req.params;
 
-  const election = await Election.findById(electionId);
+  const { page, limit, skip, sort } = buildPagination(req.query);
+  const { search } = req.query;
 
-  if (!election) {
-    throw new ApiError(404, "Election not found");
+  const filter = { election: electionId };
+
+  if (search) {
+    filter.$or = [
+      { title: { $regex: search, $options: "i" } },
+      { description: { $regex: search, $options: "i" } },
+    ];
   }
 
-  const posts = await Post.find({ electionId }).sort({ createdAt: 1 });
+  const [totalItems, posts] = await Promise.all([
+    Post.countDocuments(filter),
+    Post.find(filter).sort(sort).skip(skip).limit(limit),
+  ]);
 
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        count: posts.length,
-        posts,
-      },
-      "Posts fetched successfully",
-    ),
-  );
+  const pagination = buildPaginationResponse({
+    totalItems,
+    page,
+    limit,
+  });
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { items: posts, pagination },
+        "Posts fetched successfully",
+      ),
+    );
 });
 
 export const getPostById = asyncHandler(async (req, res) => {

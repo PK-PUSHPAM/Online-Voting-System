@@ -2,23 +2,50 @@ import User from "../models/User.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
+import { buildPagination } from "../utils/pagination.util.js";
+import { buildPaginationResponse } from "../utils/paginationResponse.util.js";
 
 export const getPendingVoters = asyncHandler(async (req, res) => {
-  const voters = await User.find({
-    role: "voter",
-    verificationStatus: "pending",
-  }).select("-password -refreshToken");
+  const { page, limit, skip, sort } = buildPagination(req.query);
+  const { search } = req.query;
 
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        count: voters.length,
-        voters,
-      },
-      "Pending voters fetched successfully",
-    ),
-  );
+  const filter = {
+    role: "voter",
+    isVerified: false,
+  };
+
+  if (search) {
+    filter.$or = [
+      { fullName: { $regex: search, $options: "i" } },
+      { email: { $regex: search, $options: "i" } },
+      { mobileNumber: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  const [totalItems, voters] = await Promise.all([
+    User.countDocuments(filter),
+    User.find(filter)
+      .select("-password -refreshToken")
+      .sort(sort)
+      .skip(skip)
+      .limit(limit),
+  ]);
+
+  const pagination = buildPaginationResponse({
+    totalItems,
+    page,
+    limit,
+  });
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { items: voters, pagination },
+        "Pending voters fetched successfully",
+      ),
+    );
 });
 
 export const approveVoter = asyncHandler(async (req, res) => {

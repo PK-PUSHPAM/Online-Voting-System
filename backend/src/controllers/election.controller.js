@@ -3,6 +3,8 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import syncElectionStatus from "../utils/syncElectionStatus.js";
+import { buildPagination } from "../utils/pagination.util.js";
+import { buildPaginationResponse } from "../utils/paginationResponse.util.js";
 
 export const createElection = asyncHandler(async (req, res) => {
   const {
@@ -54,20 +56,42 @@ export const createElection = asyncHandler(async (req, res) => {
 });
 
 export const getAllElections = asyncHandler(async (req, res) => {
-  const elections = await Election.find()
-    .populate("createdBy", "fullName email role")
-    .sort({ createdAt: -1 });
+  const { page, limit, skip, sort } = buildPagination(req.query);
 
-  const syncedElections = await Promise.all(
-    elections.map(async (election) => await syncElectionStatus(election)),
-  );
+  const { status, search } = req.query;
+
+  const filter = {};
+
+  // 🔹 Status filter
+  if (status) {
+    filter.status = status;
+  }
+
+  // 🔹 Search filter (title / description)
+  if (search) {
+    filter.$or = [
+      { title: { $regex: search, $options: "i" } },
+      { description: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  const [totalItems, elections] = await Promise.all([
+    Election.countDocuments(filter),
+    Election.find(filter).sort(sort).skip(skip).limit(limit),
+  ]);
+
+  const pagination = buildPaginationResponse({
+    totalItems,
+    page,
+    limit,
+  });
 
   return res.status(200).json(
     new ApiResponse(
       200,
       {
-        count: syncedElections.length,
-        elections: syncedElections,
+        items: elections,
+        pagination,
       },
       "Elections fetched successfully",
     ),

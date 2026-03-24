@@ -4,6 +4,8 @@ import Post from "../models/Post.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
+import { buildPagination } from "../utils/pagination.util.js";
+import { buildPaginationResponse } from "../utils/paginationResponse.util.js";
 
 export const createCandidate = asyncHandler(async (req, res) => {
   const { electionId, postId } = req.params;
@@ -77,57 +79,75 @@ export const createCandidate = asyncHandler(async (req, res) => {
 export const getCandidatesByPost = asyncHandler(async (req, res) => {
   const { postId } = req.params;
 
-  const post = await Post.findById(postId).populate(
-    "electionId",
-    "title status startDate endDate",
-  );
+  const { page, limit, skip, sort } = buildPagination(req.query);
+  const { search } = req.query;
 
-  if (!post) {
-    throw new ApiError(404, "Post not found");
+  const filter = { post: postId };
+
+  if (search) {
+    filter.$or = [
+      { fullName: { $regex: search, $options: "i" } },
+      { partyName: { $regex: search, $options: "i" } },
+    ];
   }
 
-  const candidates = await Candidate.find({ postId })
-    .populate("addedBy", "fullName email role")
-    .sort({ createdAt: 1 });
+  const [totalItems, candidates] = await Promise.all([
+    Candidate.countDocuments(filter),
+    Candidate.find(filter).sort(sort).skip(skip).limit(limit),
+  ]);
 
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        count: candidates.length,
-        post,
-        candidates,
-      },
-      "Candidates fetched successfully",
-    ),
-  );
+  const pagination = buildPaginationResponse({
+    totalItems,
+    page,
+    limit,
+  });
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { items: candidates, pagination },
+        "Candidates fetched successfully",
+      ),
+    );
 });
 
 export const getCandidatesByElection = asyncHandler(async (req, res) => {
   const { electionId } = req.params;
 
-  const election = await Election.findById(electionId);
+  const { page, limit, skip, sort } = buildPagination(req.query);
+  const { search } = req.query;
 
-  if (!election) {
-    throw new ApiError(404, "Election not found");
+  const filter = { election: electionId };
+
+  if (search) {
+    filter.$or = [
+      { fullName: { $regex: search, $options: "i" } },
+      { partyName: { $regex: search, $options: "i" } },
+    ];
   }
 
-  const candidates = await Candidate.find({ electionId })
-    .populate("postId", "title description isActive")
-    .populate("addedBy", "fullName email role")
-    .sort({ createdAt: 1 });
+  const [totalItems, candidates] = await Promise.all([
+    Candidate.countDocuments(filter),
+    Candidate.find(filter).sort(sort).skip(skip).limit(limit),
+  ]);
 
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        count: candidates.length,
-        election,
-        candidates,
-      },
-      "Candidates fetched successfully",
-    ),
-  );
+  const pagination = buildPaginationResponse({
+    totalItems,
+    page,
+    limit,
+  });
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { items: candidates, pagination },
+        "Candidates fetched successfully",
+      ),
+    );
 });
 
 export const getCandidateById = asyncHandler(async (req, res) => {
