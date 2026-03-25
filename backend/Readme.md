@@ -141,3 +141,162 @@ backend/
 └── README.md
 
 ```
+
+# ⚙️ Installation
+
+> `git clone https://github.com/PK-PUSHPAM/Online-Voting-System`  
+> `cd backend`  
+> `npm install`
+
+# ▶️ Run Server
+
+> `npm run dev`
+
+## Server runs on:
+
+- http://localhost:5000
+
+# 🔑 Environment Variables
+
+## Create .env file:
+
+```
+    PORT=5000
+    NODE_ENV=development
+
+    MONGODB_URI=your_mongodb_uri
+
+    ACCESS_TOKEN_SECRET=your_access_secret
+    ACCESS_TOKEN_EXPIRY=1d
+
+    REFRESH_TOKEN_SECRET=your_refresh_secret
+    REFRESH_TOKEN_EXPIRY=7d
+
+    CORS_ORIGIN=http://localhost:5173
+
+    # 📱 SMS (Development Mode)
+    SMS_PROVIDER=mock
+    OTP_MESSAGE_TEMPLATE=Your OTP is {{otp}}
+
+    # 📧 Email (OTP)
+    EMAIL_USER=yourgmail@gmail.com
+    EMAIL_PASS=your_google_app_password
+
+    # ☁️ Cloudinary
+    CLOUDINARY_CLOUD_NAME=your_cloud
+    CLOUDINARY_API_KEY=your_key
+    CLOUDINARY_API_SECRET=your_secret
+```
+
+# 🔐 Roles
+
+| Role  |     | Permissions                     |
+| ----- | --- | ------------------------------- |
+| Voter |     | Register, vote, view elections  |
+| Admin |     | Verify voters, manage elections |
+| Super |     | Admin Full system control       |
+
+# 🔗 API Base URL
+
+    http://localhost:5000/api/v1
+
+# 📡 API Overview
+
+### Auth
+
+    POST /auth/send-otp
+    POST /auth/register
+    POST /auth/login
+    POST /auth/login-with-otp
+    POST /auth/reset-password
+    GET /auth/me
+    POST /auth/logout
+
+### Users
+
+    GET /users/pending-voters
+    GET /users/all-voters
+    GET /users/voter/:id
+    PATCH /users/approve-voter/:id
+    PATCH /users/reject-voter/:id
+
+### Admin
+
+    GET /admin/dashboard-summary
+    POST /admin/create-admin
+    PATCH /admin/update-status/:id
+    PATCH /admin/change-role/:id
+    GET /admin/all-admins
+    GET /admin/audit-logs
+
+### Elections
+
+    POST /elections
+    GET /elections
+    GET /elections/:id
+    PATCH /elections/:id
+    DELETE /elections/:id
+
+### Posts
+
+    POST /posts
+    GET /posts/election/:id
+    PATCH /posts/:id
+    DELETE /posts/:id
+
+### Candidates
+
+    POST /candidates
+    GET /candidates/post/:id
+    PATCH /candidates/:id
+    PATCH /candidates/approve/:id
+    DELETE /candidates/:id
+
+### Votes
+
+    POST /votes
+    GET /votes/my
+    GET /votes/election/:id
+
+### Results
+
+    GET /results/election/:id
+    GET /results/election/:id/post/:id
+
+### Uploads
+
+    POST /uploads/candidate-photo
+    POST /uploads/voter-document
+
+# 🧪 Development Notes
+
+    Mobile OTP → mock mode
+    Email OTP → real working
+    Use Postman for testing
+    Use MongoDB Compass for DB inspection
+
+# ⚠️ Important
+
+    Do NOT expose .env
+    Always hash passwords
+    Use App Password for Gmail
+    Rotate API keys if leaked
+
+# 🚀 Future Improvements
+
+    Rate limiting (anti-spam OTP)
+    Multi-provider SMS fallback
+    Real-time vote analytics
+    WebSocket updates
+    Admin UI dashboard charts
+    Deployment (Docker + CI/CD)
+
+# 👨‍💻 Author
+
+    Pushpam
+    B.Tech CSE
+    Online Voting System Project
+
+# ⭐ Support
+
+- If you like this project, consider giving it a ⭐ on GitHub.
