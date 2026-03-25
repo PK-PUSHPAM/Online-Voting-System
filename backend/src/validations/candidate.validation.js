@@ -3,27 +3,38 @@ import {
   emptyObjectSchema,
   mongoIdSchema,
   paginationQuerySchema,
+  optionalBooleanQuerySchema,
+  nonNegativeIntegerSchema,
 } from "./common.validation.js";
 
-const candidateBodySchema = z.object({
+const approvalStatusSchema = z.enum(["pending", "approved", "rejected"]);
+
+const candidateBodyBaseSchema = z.object({
+  userId: mongoIdSchema("userId").optional(),
+
   fullName: z.string().trim().min(3, "Candidate fullName is required"),
-  email: z.string().trim().email("Invalid email").optional().or(z.literal("")),
-  mobileNumber: z
-    .string()
-    .trim()
-    .regex(/^[6-9]\d{9}$/, "Invalid mobile number")
-    .optional()
-    .or(z.literal("")),
+
   partyName: z.string().trim().optional().default(""),
-  partySymbolUrl: z.string().trim().optional().default(""),
-  candidatePhotoUrl: z.string().trim().optional().default(""),
-  photoPublicId: z.string().trim().optional().default(""),
   manifesto: z.string().trim().optional().default(""),
-  isApproved: z.boolean().optional(),
+
+  candidatePhotoUrl: z.string().trim().optional().default(""),
+  candidatePhotoPublicId: z.string().trim().optional().default(""),
+
+  // legacy compatibility
+  photoPublicId: z.string().trim().optional(),
+
+  displayOrder: nonNegativeIntegerSchema("displayOrder").optional(),
+  isActive: z.boolean().optional(),
+});
+
+const normalizeCandidateBody = (data) => ({
+  ...data,
+  candidatePhotoPublicId:
+    data.candidatePhotoPublicId?.trim() || data.photoPublicId?.trim() || "",
 });
 
 export const createCandidateSchema = z.object({
-  body: candidateBodySchema,
+  body: candidateBodyBaseSchema.transform(normalizeCandidateBody),
   params: z.object({
     electionId: mongoIdSchema("electionId"),
     postId: mongoIdSchema("postId"),
@@ -32,11 +43,12 @@ export const createCandidateSchema = z.object({
 });
 
 export const updateCandidateSchema = z.object({
-  body: candidateBodySchema
+  body: candidateBodyBaseSchema
     .partial()
     .refine((data) => Object.keys(data).length > 0, {
       message: "At least one field is required for update",
-    }),
+    })
+    .transform(normalizeCandidateBody),
   params: z.object({
     candidateId: mongoIdSchema("candidateId"),
   }),
@@ -58,7 +70,10 @@ export const getCandidatesByPostSchema = z.object({
   params: z.object({
     postId: mongoIdSchema("postId"),
   }),
-  query: paginationQuerySchema,
+  query: paginationQuerySchema.extend({
+    approvalStatus: approvalStatusSchema.optional(),
+    isActive: optionalBooleanQuerySchema,
+  }),
 });
 
 export const getCandidatesByElectionSchema = z.object({
@@ -66,14 +81,30 @@ export const getCandidatesByElectionSchema = z.object({
   params: z.object({
     electionId: mongoIdSchema("electionId"),
   }),
-  query: paginationQuerySchema,
+  query: paginationQuerySchema.extend({
+    approvalStatus: approvalStatusSchema.optional(),
+    isActive: optionalBooleanQuerySchema,
+  }),
 });
 
 export const approveCandidateSchema = z.object({
-  body: z.object({
-    action: z.enum(["approve", "reject"], "Action must be approve or reject"),
-    rejectionReason: z.string().trim().optional().default(""),
-  }),
+  body: z
+    .object({
+      action: z.enum(["approve", "reject"]),
+      rejectionReason: z.string().trim().max(500).optional().default(""),
+    })
+    .superRefine((data, ctx) => {
+      if (
+        data.action === "reject" &&
+        (!data.rejectionReason || !data.rejectionReason.trim())
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["rejectionReason"],
+          message: "rejectionReason is required when action is reject",
+        });
+      }
+    }),
   params: z.object({
     candidateId: mongoIdSchema("candidateId"),
   }),

@@ -3,6 +3,8 @@ import {
   emptyObjectSchema,
   mongoIdSchema,
   paginationQuerySchema,
+  optionalBooleanQuerySchema,
+  nonNegativeIntegerSchema,
 } from "./common.validation.js";
 
 const postBodySchema = z.object({
@@ -12,7 +14,9 @@ const postBodySchema = z.object({
     .number()
     .int("maxVotesPerVoter must be an integer")
     .min(1, "maxVotesPerVoter must be at least 1")
+    .max(10, "maxVotesPerVoter must not exceed 10")
     .optional(),
+  displayOrder: nonNegativeIntegerSchema("displayOrder").optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -29,7 +33,9 @@ export const getPostsByElectionSchema = z.object({
   params: z.object({
     electionId: mongoIdSchema("electionId"),
   }),
-  query: paginationQuerySchema,
+  query: paginationQuerySchema.extend({
+    isActive: optionalBooleanQuerySchema,
+  }),
 });
 
 export const getPostByIdSchema = z.object({
