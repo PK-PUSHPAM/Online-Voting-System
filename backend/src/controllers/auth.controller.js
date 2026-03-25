@@ -14,6 +14,7 @@ import {
   accessTokenCookieOptions,
   refreshTokenCookieOptions,
 } from "../constants/cookieOptions.constants.js";
+import sendEmail from "../utils/sendEmail.js";
 
 const OTP_EXPIRY_IN_MS = 5 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_IN_MS = 60 * 1000;
@@ -215,6 +216,13 @@ const sendOtpToMobile = async ({ mobileNumber, otp, purpose }) => {
     let parsedResponse = null;
     try {
       parsedResponse = rawResponse ? JSON.parse(rawResponse) : null;
+      console.log("SMS_PROVIDER:", provider);
+      console.log("SMS_API_URL:", smsApiUrl);
+      console.log("SMS_HEADERS:", headers);
+      console.log("SMS_BODY:", body);
+      console.log("SMS_RESPONSE_STATUS:", response.status);
+      console.log("SMS_RESPONSE_RAW:", rawResponse);
+      console.log("SMS_RESPONSE_PARSED:", parsedResponse);
     } catch {
       parsedResponse = rawResponse;
     }
@@ -339,6 +347,34 @@ export const sendOtp = asyncHandler(async (req, res) => {
   });
 
   const otp = generateOtp();
+
+  // Send OTP via email
+  const emailMessage = `Your OTP is ${otp}. It is valid for 5 minutes.`;
+  const emailRecipient = existingUser?.email || req.body.email;
+
+  console.log("Attempting to send OTP email to:", emailRecipient);
+
+  try {
+    if (!emailRecipient) {
+      throw new Error("Email recipient not found");
+    }
+
+    await sendEmail({
+      to: emailRecipient,
+      subject: "OTP Verification",
+      text: emailMessage,
+    });
+
+    console.log("OTP email sent successfully to:", emailRecipient);
+  } catch (error) {
+    console.error("Failed to send OTP email:", {
+      recipient: emailRecipient,
+      error: error.message,
+      fullError: error,
+    });
+    // Continue with SMS OTP even if email fails
+  }
+
   const hashedOtp = hashOtpCode(otp);
   const expiresAt = new Date(Date.now() + OTP_EXPIRY_IN_MS);
 

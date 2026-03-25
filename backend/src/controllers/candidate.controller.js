@@ -65,10 +65,11 @@ const ensureUpcomingElection = (election) => {
 };
 
 export const createCandidate = asyncHandler(async (req, res) => {
-  const { body } = req.validatedData || { body: req.body };
+  const { body, params } = req.validatedData || {
+    body: req.body,
+    params: req.params,
+  };
   const {
-    electionId,
-    postId,
     userId,
     fullName,
     partyName,
@@ -78,6 +79,8 @@ export const createCandidate = asyncHandler(async (req, res) => {
     displayOrder,
     isActive,
   } = body;
+
+  const { electionId, postId } = params;
 
   const [election, post, linkedUser] = await Promise.all([
     Election.findById(electionId),

@@ -68,3 +68,14 @@ export const getCandidatesByElectionSchema = z.object({
   }),
   query: paginationQuerySchema,
 });
+
+export const approveCandidateSchema = z.object({
+  body: z.object({
+    action: z.enum(["approve", "reject"], "Action must be approve or reject"),
+    rejectionReason: z.string().trim().optional().default(""),
+  }),
+  params: z.object({
+    candidateId: mongoIdSchema("candidateId"),
+  }),
+  query: emptyObjectSchema,
+});

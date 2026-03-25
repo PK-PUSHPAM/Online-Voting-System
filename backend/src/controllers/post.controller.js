@@ -27,15 +27,13 @@ const ensureUpcomingElection = (election) => {
 };
 
 export const createPost = asyncHandler(async (req, res) => {
-  const { body } = req.validatedData || { body: req.body };
-  const {
-    electionId,
-    title,
-    description,
-    maxVotesPerVoter,
-    displayOrder,
-    isActive,
-  } = body;
+  const { body, params } = req.validatedData || {
+    body: req.body,
+    params: req.params,
+  };
+  const { title, description, maxVotesPerVoter, displayOrder, isActive } = body;
+
+  const { electionId } = params;
 
   const election = await Election.findById(electionId);
 

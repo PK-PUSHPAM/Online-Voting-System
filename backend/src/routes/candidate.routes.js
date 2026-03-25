@@ -8,6 +8,7 @@ import {
   getCandidatesByElection,
   getCandidateById,
   updateCandidate,
+  approveCandidate,
   deleteCandidate,
 } from "../controllers/candidate.controller.js";
 import {
@@ -16,6 +17,7 @@ import {
   getCandidatesByElectionSchema,
   getCandidateByIdSchema,
   updateCandidateSchema,
+  approveCandidateSchema,
   deleteCandidateSchema,
 } from "../validations/candidate.validation.js";
 
@@ -59,6 +61,14 @@ router.patch(
   authorizeRoles("admin", "super_admin"),
   validate(updateCandidateSchema),
   updateCandidate,
+);
+
+router.patch(
+  "/approve/:candidateId",
+  verifyJWT,
+  authorizeRoles("admin", "super_admin"),
+  validate(approveCandidateSchema),
+  approveCandidate,
 );
 
 router.delete(

@@ -145,17 +145,12 @@ const userSchema = new mongoose.Schema(
 userSchema.index({ role: 1, verificationStatus: 1, createdAt: -1 });
 userSchema.index({ role: 1, isActive: 1, createdAt: -1 });
 
-userSchema.pre("save", async function (next) {
-  try {
-    if (!this.isModified("password")) {
-      return next();
-    }
-
-    this.password = await bcrypt.hash(this.password, 12);
-    next();
-  } catch (error) {
-    next(error);
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) {
+    return;
   }
+
+  this.password = await bcrypt.hash(this.password, 12);
 });
 
 userSchema.methods.isPasswordCorrect = async function (password) {
