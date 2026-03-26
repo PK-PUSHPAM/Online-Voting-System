@@ -17,6 +17,9 @@ import ElectionsPage from "../pages/admin/ElectionsPage";
 import VotersApprovalPage from "../pages/admin/VotersApprovalPage";
 import PostsManagementPage from "../pages/admin/PostsManagementPage";
 import CandidatesManagementPage from "../pages/admin/CandidatesManagementPage";
+import ResultsAnalyticsPage from "../pages/admin/ResultsAnalyticsPage";
+import ManageAdminsPage from "../pages/admin/ManageAdminsPage";
+import SystemControlPage from "../pages/admin/SystemControlPage";
 
 import DashboardLayout from "../components/layout/DashboardLayout";
 
@@ -60,28 +63,34 @@ export default function AppRouter() {
             <RoleRoute allowedRoles={["admin", "super_admin", "superadmin"]} />
           }
         >
-          <Route element={<DashboardLayout />}>
-            <Route path="/admin" element={<AdminDashboardPage />} />
-            <Route path="/admin/elections" element={<ElectionsPage />} />
-            <Route path="/admin/posts" element={<PostsManagementPage />} />
+          <Route path="/admin" element={<DashboardLayout />}>
+            <Route index element={<AdminDashboardPage />} />
+            <Route path="elections" element={<ElectionsPage />} />
+            <Route path="posts" element={<PostsManagementPage />} />
+            <Route path="candidates" element={<CandidatesManagementPage />} />
+            <Route path="voters" element={<VotersApprovalPage />} />
+            <Route path="results" element={<ResultsAnalyticsPage />} />
+
             <Route
-              path="/admin/candidates"
-              element={<CandidatesManagementPage />}
-            />
-            <Route path="/admin/voters" element={<VotersApprovalPage />} />
+              element={
+                <RoleRoute allowedRoles={["super_admin", "superadmin"]} />
+              }
+            >
+              <Route path="manage-admins" element={<ManageAdminsPage />} />
+              <Route path="system" element={<SystemControlPage />} />
+            </Route>
           </Route>
         </Route>
 
         <Route
           path={APP_ROUTES.VOTER_DASHBOARD}
           element={
-            <div style={{ padding: 40 }}>Voter Dashboard (next phase)</div>
+            <div style={{ padding: 40, color: "#e5eefc" }}>
+              Voter Dashboard (next phase)
+            </div>
           }
         />
       </Route>
-
-      <Route path="/admin/manage-admins" element={<div>Manage Admins</div>} />
-      <Route path="/admin/system" element={<div>System Control</div>} />
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

@@ -7,73 +7,183 @@ import {
   Briefcase,
   UserSquare2,
   Shield,
+  ChevronLeft,
+  X,
+  Sparkles,
+  Trophy,
 } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 
-const linkStyle = ({ isActive }) => ({
-  padding: "10px 12px",
-  borderRadius: "10px",
-  display: "flex",
-  alignItems: "center",
-  gap: "10px",
-  color: isActive ? "#ffffff" : "#cccccc",
-  background: isActive ? "rgba(91, 93, 240, 0.18)" : "transparent",
-});
+function SidebarLink({ to, icon: Icon, label, end = false, onNavigate }) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        `admin-sidebar__link ${isActive ? "admin-sidebar__link--active" : ""}`
+      }
+      onClick={onNavigate}
+    >
+      <span className="admin-sidebar__link-icon">
+        <Icon size={18} />
+      </span>
+      <span className="admin-sidebar__link-label">{label}</span>
+    </NavLink>
+  );
+}
 
-export default function AdminSidebar() {
+export default function AdminSidebar({
+  isMobileOpen = false,
+  onClose = () => {},
+  isDesktopCollapsed = false,
+  onDesktopToggle = () => {},
+}) {
   const { user } = useAuth();
 
   const role = String(user?.role || "").toLowerCase();
   const isSuperAdmin = role === "super_admin" || role === "superadmin";
 
+  const handleNavigate = () => {
+    if (isMobileOpen) {
+      onClose();
+    }
+  };
+
   return (
-    <aside className="sidebar">
-      <div className="sidebar__logo">
-        <img src="/icon/favicon.svg" alt="logo" />
-        <span>VoteX</span>
-      </div>
+    <>
+      <aside
+        className={[
+          "admin-sidebar",
+          isMobileOpen ? "admin-sidebar--mobile-open" : "",
+          isDesktopCollapsed ? "admin-sidebar--collapsed" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <div className="admin-sidebar__top">
+          <div className="admin-sidebar__brand">
+            <div className="admin-sidebar__brand-mark">
+              <Vote size={18} />
+            </div>
 
-      <nav className="sidebar__nav">
-        <NavLink to="/admin" style={linkStyle}>
-          <LayoutDashboard size={18} />
-          Dashboard
-        </NavLink>
+            <div className="admin-sidebar__brand-text">
+              <strong>VoteX Pro</strong>
+              <span>Election control panel</span>
+            </div>
+          </div>
 
-        <NavLink to="/admin/elections" style={linkStyle}>
-          <Vote size={18} />
-          Elections
-        </NavLink>
+          <button
+            type="button"
+            className="admin-sidebar__icon-btn admin-sidebar__desktop-toggle"
+            onClick={onDesktopToggle}
+            aria-label="Toggle sidebar"
+          >
+            <ChevronLeft size={18} />
+          </button>
 
-        <NavLink to="/admin/posts" style={linkStyle}>
-          <Briefcase size={18} />
-          Posts
-        </NavLink>
+          <button
+            type="button"
+            className="admin-sidebar__icon-btn admin-sidebar__mobile-close"
+            onClick={onClose}
+            aria-label="Close sidebar"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-        <NavLink to="/admin/candidates" style={linkStyle}>
-          <UserSquare2 size={18} />
-          Candidates
-        </NavLink>
+        <div className="admin-sidebar__role-card">
+          <div className="admin-sidebar__role-icon">
+            <Sparkles size={16} />
+          </div>
+          <div>
+            <p className="admin-sidebar__role-label">Signed in as</p>
+            <h4 className="admin-sidebar__role-title">
+              {isSuperAdmin ? "Super Admin" : "Admin"}
+            </h4>
+          </div>
+        </div>
 
-        <NavLink to="/admin/voters" style={linkStyle}>
-          <Users size={18} />
-          Voters
-        </NavLink>
+        <nav className="admin-sidebar__nav">
+          <SidebarLink
+            to="/admin"
+            end
+            icon={LayoutDashboard}
+            label="Dashboard"
+            onNavigate={handleNavigate}
+          />
 
-        {/* 🔥 SUPER ADMIN ONLY */}
-        {isSuperAdmin && (
-          <>
-            <NavLink to="/admin/manage-admins" style={linkStyle}>
-              <Shield size={18} />
-              Manage Admins
-            </NavLink>
+          <SidebarLink
+            to="/admin/elections"
+            icon={Vote}
+            label="Elections"
+            onNavigate={handleNavigate}
+          />
 
-            <NavLink to="/admin/system" style={linkStyle}>
-              <BarChart3 size={18} />
-              System Control
-            </NavLink>
-          </>
-        )}
-      </nav>
-    </aside>
+          <SidebarLink
+            to="/admin/posts"
+            icon={Briefcase}
+            label="Posts"
+            onNavigate={handleNavigate}
+          />
+
+          <SidebarLink
+            to="/admin/candidates"
+            icon={UserSquare2}
+            label="Candidates"
+            onNavigate={handleNavigate}
+          />
+
+          <SidebarLink
+            to="/admin/voters"
+            icon={Users}
+            label="Voters"
+            onNavigate={handleNavigate}
+          />
+
+          <SidebarLink
+            to="/admin/results"
+            icon={Trophy}
+            label="Results Analytics"
+            onNavigate={handleNavigate}
+          />
+
+          {isSuperAdmin && (
+            <>
+              <div className="admin-sidebar__group-label">Super Admin</div>
+
+              <SidebarLink
+                to="/admin/manage-admins"
+                icon={Shield}
+                label="Manage Admins"
+                onNavigate={handleNavigate}
+              />
+
+              <SidebarLink
+                to="/admin/system"
+                icon={BarChart3}
+                label="System Control"
+                onNavigate={handleNavigate}
+              />
+            </>
+          )}
+        </nav>
+
+        <div className="admin-sidebar__footer">
+          <p>
+            Product UI ka matlab hai control, clarity, and trust. Sirf flashy
+            gradients se kaam nahi chalta.
+          </p>
+        </div>
+      </aside>
+
+      {isMobileOpen && (
+        <button
+          type="button"
+          className="admin-sidebar__backdrop"
+          onClick={onClose}
+          aria-label="Close sidebar backdrop"
+        />
+      )}
+    </>
   );
 }

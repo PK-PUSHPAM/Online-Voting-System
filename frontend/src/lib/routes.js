@@ -7,5 +7,13 @@ export const APP_ROUTES = {
   UNAUTHORIZED: "/unauthorized",
 
   ADMIN_DASHBOARD: "/admin",
+  ADMIN_ELECTIONS: "/admin/elections",
+  ADMIN_POSTS: "/admin/posts",
+  ADMIN_CANDIDATES: "/admin/candidates",
+  ADMIN_VOTERS: "/admin/voters",
+  ADMIN_RESULTS: "/admin/results",
+  ADMIN_MANAGE_ADMINS: "/admin/manage-admins",
+  ADMIN_SYSTEM: "/admin/system",
+
   VOTER_DASHBOARD: "/voter",
 };

@@ -1,18 +1,35 @@
 import { Outlet } from "react-router-dom";
+import { useState } from "react";
 import AdminSidebar from "./AdminSidebar";
 import Topbar from "./Topbar";
 
 export default function DashboardLayout() {
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] =
+    useState(false);
+
   return (
-    <div className="dashboard">
-      <AdminSidebar />
+    <div className="admin-shell">
+      <AdminSidebar
+        isMobileOpen={isMobileSidebarOpen}
+        onClose={() => setIsMobileSidebarOpen(false)}
+        isDesktopCollapsed={isDesktopSidebarCollapsed}
+        onDesktopToggle={() => setIsDesktopSidebarCollapsed((prev) => !prev)}
+      />
 
-      <div className="dashboard__main">
-        <Topbar />
+      <div
+        className={[
+          "admin-shell__main",
+          isDesktopSidebarCollapsed ? "admin-shell__main--expanded" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <Topbar onOpenSidebar={() => setIsMobileSidebarOpen(true)} />
 
-        <div className="dashboard__content">
+        <main className="admin-shell__content">
           <Outlet />
-        </div>
+        </main>
       </div>
     </div>
   );
