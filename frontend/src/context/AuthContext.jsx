@@ -19,8 +19,9 @@ export default function AuthProvider({ children }) {
   const fetchCurrentUser = useCallback(async () => {
     try {
       const data = await authService.getCurrentUser();
-      setUser(data);
-      return data;
+      const normalizedUser = data?.user || data || null;
+      setUser(normalizedUser);
+      return normalizedUser;
     } catch {
       setUser(null);
       return null;
@@ -41,8 +42,12 @@ export default function AuthProvider({ children }) {
     setIsAuthActionLoading(true);
     try {
       const data = await authService.login(payload);
-      setUser(data?.user || null);
-      return data;
+      const normalizedUser = data?.user || data || null;
+      setUser(normalizedUser);
+      return {
+        ...data,
+        user: normalizedUser,
+      };
     } finally {
       setIsAuthActionLoading(false);
     }
@@ -52,8 +57,12 @@ export default function AuthProvider({ children }) {
     setIsAuthActionLoading(true);
     try {
       const data = await authService.loginWithOtp(payload);
-      setUser(data?.user || null);
-      return data;
+      const normalizedUser = data?.user || data || null;
+      setUser(normalizedUser);
+      return {
+        ...data,
+        user: normalizedUser,
+      };
     } finally {
       setIsAuthActionLoading(false);
     }

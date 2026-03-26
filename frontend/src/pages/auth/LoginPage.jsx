@@ -9,7 +9,15 @@ import { APP_ROUTES } from "../../lib/routes";
 import { getApiErrorMessage } from "../../lib/utils";
 
 const getRedirectPathByRole = (role) => {
-  if (role === "admin" || role === "super_admin") {
+  if (!role) return APP_ROUTES.VOTER_DASHBOARD;
+
+  const normalizedRole = String(role).toLowerCase();
+
+  if (
+    normalizedRole === "admin" ||
+    normalizedRole === "super_admin" ||
+    normalizedRole === "superadmin"
+  ) {
     return APP_ROUTES.ADMIN_DASHBOARD;
   }
 
@@ -56,6 +64,9 @@ export default function LoginPage() {
 
     try {
       const data = await login(form);
+
+      console.log("LOGIN USER:", data?.user);
+
       toast.success("Login successful");
 
       const fallbackPath = getRedirectPathByRole(data?.user?.role);
@@ -70,7 +81,7 @@ export default function LoginPage() {
   return (
     <AuthLayout
       title="Welcome back"
-      subtitle="Login with your password. Cookie-based auth and route protection are already wired."
+      subtitle="Login with your password to continue into the voting platform."
     >
       <form onSubmit={handleSubmit} className="auth-form">
         <InputField

@@ -14,7 +14,9 @@ export default function RoleRoute({ allowedRoles = [] }) {
     return <Navigate to={APP_ROUTES.LOGIN} replace />;
   }
 
-  if (!allowedRoles.includes(user.role)) {
+  const normalizedRole = String(user?.role || "").toLowerCase();
+
+  if (!allowedRoles.includes(normalizedRole)) {
     return <Navigate to={APP_ROUTES.UNAUTHORIZED} replace />;
   }
 

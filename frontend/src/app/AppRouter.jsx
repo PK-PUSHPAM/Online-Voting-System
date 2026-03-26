@@ -5,41 +5,35 @@ import OtpLoginPage from "../pages/auth/OtpLoginPage";
 import ForgotPasswordPage from "../pages/auth/ForgotPasswordPage";
 import UnauthorizedPage from "../pages/shared/UnauthorizedPage";
 import NotFoundPage from "../pages/shared/NotFoundPage";
+
 import ProtectedRoute from "../routes/ProtectedRoute";
 import RoleRoute from "../routes/RoleRoute";
+
 import { APP_ROUTES } from "../lib/routes";
 import { useAuth } from "../hooks/useAuth";
 
-function AdminPlaceholder() {
-  return (
-    <div className="dashboard-placeholder">
-      <h1>Admin Dashboard</h1>
-      <p>Next batch me actual admin layout + summary cards banayenge.</p>
-    </div>
-  );
-}
+import AdminDashboardPage from "../pages/admin/AdminDashboardPage";
+import ElectionsPage from "../pages/admin/ElectionsPage";
+import VotersApprovalPage from "../pages/admin/VotersApprovalPage";
+import PostsManagementPage from "../pages/admin/PostsManagementPage";
+import CandidatesManagementPage from "../pages/admin/CandidatesManagementPage";
 
-function VoterPlaceholder() {
-  return (
-    <div className="dashboard-placeholder">
-      <h1>Voter Dashboard</h1>
-      <p>Next batch me active elections + vote flow banayenge.</p>
-    </div>
-  );
-}
+import DashboardLayout from "../components/layout/DashboardLayout";
 
 function HomeRedirect() {
   const { user, isBootstrapping } = useAuth();
 
-  if (isBootstrapping) {
-    return null;
-  }
+  if (isBootstrapping) return null;
 
-  if (!user) {
-    return <Navigate to={APP_ROUTES.LOGIN} replace />;
-  }
+  if (!user) return <Navigate to={APP_ROUTES.LOGIN} replace />;
 
-  if (user.role === "admin" || user.role === "super_admin") {
+  const normalizedRole = String(user?.role || "").toLowerCase();
+
+  if (
+    normalizedRole === "admin" ||
+    normalizedRole === "super_admin" ||
+    normalizedRole === "superadmin"
+  ) {
     return <Navigate to={APP_ROUTES.ADMIN_DASHBOARD} replace />;
   }
 
@@ -49,7 +43,8 @@ function HomeRedirect() {
 export default function AppRouter() {
   return (
     <Routes>
-      <Route path={APP_ROUTES.HOME} element={<HomeRedirect />} />
+      <Route path="/" element={<HomeRedirect />} />
+
       <Route path={APP_ROUTES.LOGIN} element={<LoginPage />} />
       <Route path={APP_ROUTES.REGISTER} element={<RegisterPage />} />
       <Route path={APP_ROUTES.OTP_LOGIN} element={<OtpLoginPage />} />
@@ -60,20 +55,33 @@ export default function AppRouter() {
       <Route path={APP_ROUTES.UNAUTHORIZED} element={<UnauthorizedPage />} />
 
       <Route element={<ProtectedRoute />}>
-        <Route element={<RoleRoute allowedRoles={["admin", "super_admin"]} />}>
-          <Route
-            path={APP_ROUTES.ADMIN_DASHBOARD}
-            element={<AdminPlaceholder />}
-          />
+        <Route
+          element={
+            <RoleRoute allowedRoles={["admin", "super_admin", "superadmin"]} />
+          }
+        >
+          <Route element={<DashboardLayout />}>
+            <Route path="/admin" element={<AdminDashboardPage />} />
+            <Route path="/admin/elections" element={<ElectionsPage />} />
+            <Route path="/admin/posts" element={<PostsManagementPage />} />
+            <Route
+              path="/admin/candidates"
+              element={<CandidatesManagementPage />}
+            />
+            <Route path="/admin/voters" element={<VotersApprovalPage />} />
+          </Route>
         </Route>
 
-        <Route element={<RoleRoute allowedRoles={["voter"]} />}>
-          <Route
-            path={APP_ROUTES.VOTER_DASHBOARD}
-            element={<VoterPlaceholder />}
-          />
-        </Route>
+        <Route
+          path={APP_ROUTES.VOTER_DASHBOARD}
+          element={
+            <div style={{ padding: 40 }}>Voter Dashboard (next phase)</div>
+          }
+        />
       </Route>
+
+      <Route path="/admin/manage-admins" element={<div>Manage Admins</div>} />
+      <Route path="/admin/system" element={<div>System Control</div>} />
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

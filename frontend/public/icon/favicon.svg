@@ -1,0 +1,47 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="64" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="50%" stop-color="#4F46E5"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+
+    <linearGradient id="cardGradient" x1="140" y1="96" x2="372" y2="250" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#DBEAFE"/>
+    </linearGradient>
+
+    <linearGradient id="checkGradient" x1="210" y1="214" x2="302" y2="306" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22C55E"/>
+      <stop offset="100%" stop-color="#16A34A"/>
+    </linearGradient>
+
+    <filter id="shadow" x="40" y="40" width="432" height="432" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#0F172A" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <!-- Outer rounded square -->
+  <g filter="url(#shadow)">
+    <rect x="64" y="64" width="384" height="384" rx="96" fill="url(#bgGradient)"/>
+  </g>
+
+  <!-- Voting slip -->
+  <g transform="rotate(-12 256 176)">
+    <rect x="164" y="104" width="184" height="124" rx="24" fill="url(#cardGradient)"/>
+    <rect x="194" y="138" width="88" height="16" rx="8" fill="#93C5FD"/>
+    <rect x="194" y="168" width="124" height="16" rx="8" fill="#BFDBFE"/>
+  </g>
+
+  <!-- Check circle -->
+  <circle cx="304" cy="250" r="52" fill="url(#checkGradient)"/>
+  <path d="M281 250.5L296 265.5L328 233.5" stroke="white" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Ballot box -->
+  <rect x="136" y="264" width="240" height="120" rx="28" fill="#E2E8F0"/>
+  <rect x="152" y="280" width="208" height="88" rx="20" fill="#F8FAFC"/>
+  <rect x="206" y="292" width="100" height="16" rx="8" fill="#94A3B8"/>
+
+  <!-- Bottom accent -->
+  <path d="M176 392H336" stroke="#CBD5E1" stroke-width="14" stroke-linecap="round"/>
+</svg>
