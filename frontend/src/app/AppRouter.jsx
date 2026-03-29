@@ -21,7 +21,14 @@ import ResultsAnalyticsPage from "../pages/admin/ResultsAnalyticsPage";
 import ManageAdminsPage from "../pages/admin/ManageAdminsPage";
 import SystemControlPage from "../pages/admin/SystemControlPage";
 
+import VoterDashboardPage from "../pages/voter/VoterDashboardPage";
+import VoterElectionsPage from "../pages/voter/VoterElectionsPage";
+import VoterMyVotesPage from "../pages/voter/VoterMyVotesPage";
+import VoterProfilePage from "../pages/voter/VoterProfilePage";
+import VoterElectionDetailsPage from "../pages/voter/VoterElectionDetailsPage";
+
 import DashboardLayout from "../components/layout/DashboardLayout";
+import VoterLayout from "../components/layout/VoterLayout";
 
 function HomeRedirect() {
   const { user, isBootstrapping } = useAuth();
@@ -46,7 +53,7 @@ function HomeRedirect() {
 export default function AppRouter() {
   return (
     <Routes>
-      <Route path="/" element={<HomeRedirect />} />
+      <Route path={APP_ROUTES.HOME} element={<HomeRedirect />} />
 
       <Route path={APP_ROUTES.LOGIN} element={<LoginPage />} />
       <Route path={APP_ROUTES.REGISTER} element={<RegisterPage />} />
@@ -82,14 +89,18 @@ export default function AppRouter() {
           </Route>
         </Route>
 
-        <Route
-          path={APP_ROUTES.VOTER_DASHBOARD}
-          element={
-            <div style={{ padding: 40, color: "#e5eefc" }}>
-              Voter Dashboard (next phase)
-            </div>
-          }
-        />
+        <Route element={<RoleRoute allowedRoles={["voter"]} />}>
+          <Route path="/voter" element={<VoterLayout />}>
+            <Route index element={<VoterDashboardPage />} />
+            <Route path="elections" element={<VoterElectionsPage />} />
+            <Route
+              path="elections/:electionId"
+              element={<VoterElectionDetailsPage />}
+            />
+            <Route path="my-votes" element={<VoterMyVotesPage />} />
+            <Route path="profile" element={<VoterProfilePage />} />
+          </Route>
+        </Route>
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />

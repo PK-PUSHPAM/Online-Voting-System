@@ -16,4 +16,11 @@ export const APP_ROUTES = {
   ADMIN_SYSTEM: "/admin/system",
 
   VOTER_DASHBOARD: "/voter",
+  VOTER_ELECTIONS: "/voter/elections",
+  VOTER_MY_VOTES: "/voter/my-votes",
+  VOTER_PROFILE: "/voter/profile",
+  VOTER_ELECTION_DETAILS: "/voter/elections/:electionId",
 };
+
+export const buildVoterElectionDetailsRoute = (electionId = "") =>
+  `/voter/elections/${electionId}`;
