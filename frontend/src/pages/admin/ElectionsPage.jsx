@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { CalendarRange, CheckCircle2, Globe2, Vote } from "lucide-react";
 import { toast } from "react-hot-toast";
+import Button from "../../components/common/Button";
+import InputField from "../../components/common/InputField";
 import { electionService } from "../../services/election.service";
 import { getApiErrorMessage } from "../../lib/utils";
+import "../../styles/admin-crud.css";
 
 const initialForm = {
   title: "",
@@ -12,149 +16,44 @@ const initialForm = {
   allowedVoterType: "verifiedOnly",
 };
 
-const pageSectionStyle = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "20px",
-};
-
-const pageHeaderStyle = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: "16px",
-  flexWrap: "wrap",
-};
-
-const cardStyle = {
-  padding: "20px",
-  borderRadius: "18px",
-  background: "rgba(255,255,255,0.04)",
-  border: "1px solid rgba(255,255,255,0.08)",
-};
-
-const formGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: "16px",
-};
-
-const fullWidthStyle = {
-  gridColumn: "1 / -1",
-};
-
-const tableWrapperStyle = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "12px",
-};
-
-const tableHeaderStyle = {
-  display: "grid",
-  gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
-  gap: "12px",
-  padding: "0 6px",
-  color: "#97a6ba",
-  fontSize: "13px",
-};
-
-const tableRowStyle = {
-  display: "grid",
-  gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
-  gap: "12px",
-  padding: "16px",
-  borderRadius: "14px",
-  background: "rgba(255,255,255,0.05)",
-  border: "1px solid rgba(255,255,255,0.06)",
-  alignItems: "center",
-};
-
-const badgeBaseStyle = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  minWidth: "92px",
-  padding: "8px 12px",
-  borderRadius: "999px",
-  fontSize: "12px",
-  fontWeight: 700,
-  textTransform: "capitalize",
-};
-
-const actionsBarStyle = {
-  display: "flex",
-  gap: "12px",
-  alignItems: "center",
-  flexWrap: "wrap",
-};
-
-const searchStyle = {
-  minWidth: "240px",
-};
-
-const smallMutedStyle = {
-  margin: 0,
-  color: "#97a6ba",
-  fontSize: "14px",
-};
-
-const titleCellStyle = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "6px",
-};
-
-function formatDateTime(value) {
+const formatDateTime = (value) => {
   if (!value) return "-";
-
   const date = new Date(value);
-
   if (Number.isNaN(date.getTime())) return "-";
-
   return date.toLocaleString();
-}
+};
 
-function getStatusBadgeStyle(status) {
-  const normalized = String(status || "").toLowerCase();
+const getStatusClass = (status) => {
+  const value = String(status || "").toLowerCase();
 
-  if (normalized === "active") {
-    return {
-      ...badgeBaseStyle,
-      background: "rgba(16,185,129,0.15)",
-      color: "#34d399",
-      border: "1px solid rgba(16,185,129,0.35)",
-    };
-  }
-
-  if (normalized === "ended") {
-    return {
-      ...badgeBaseStyle,
-      background: "rgba(239,68,68,0.14)",
-      color: "#fca5a5",
-      border: "1px solid rgba(239,68,68,0.3)",
-    };
-  }
-
-  return {
-    ...badgeBaseStyle,
-    background: "rgba(245,158,11,0.14)",
-    color: "#fcd34d",
-    border: "1px solid rgba(245,158,11,0.3)",
-  };
-}
+  if (value === "active")
+    return "admin-crud__status admin-crud__status--active";
+  if (value === "ended") return "admin-crud__status admin-crud__status--ended";
+  return "admin-crud__status admin-crud__status--upcoming";
+};
 
 export default function ElectionsPage() {
+  const [form, setForm] = useState(initialForm);
   const [elections, setElections] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
   const [createLoading, setCreateLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [form, setForm] = useState(initialForm);
 
   const totalCount = useMemo(
     () => pagination?.totalItems || elections.length || 0,
     [pagination, elections.length],
+  );
+
+  const publishedCount = useMemo(
+    () => elections.filter((item) => item.isPublished).length,
+    [elections],
+  );
+
+  const activeCount = useMemo(
+    () => elections.filter((item) => item.status === "active").length,
+    [elections],
   );
 
   const loadElections = async () => {
@@ -183,14 +82,8 @@ export default function ElectionsPage() {
     loadElections();
   }, []);
 
-  const handleFilterSubmit = async (event) => {
-    event.preventDefault();
-    await loadElections();
-  };
-
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
-
     setForm((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
@@ -199,17 +92,12 @@ export default function ElectionsPage() {
 
   const validateForm = () => {
     if (!form.title.trim()) {
-      toast.error("Election title is required");
+      toast.error("Election title is required.");
       return false;
     }
 
-    if (!form.startDate) {
-      toast.error("Start date is required");
-      return false;
-    }
-
-    if (!form.endDate) {
-      toast.error("End date is required");
+    if (!form.startDate || !form.endDate) {
+      toast.error("Start and end date are required.");
       return false;
     }
 
@@ -217,19 +105,19 @@ export default function ElectionsPage() {
     const end = new Date(form.endDate);
 
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      toast.error("Invalid start or end date");
+      toast.error("Please enter valid dates.");
       return false;
     }
 
     if (start >= end) {
-      toast.error("End date must be greater than start date");
+      toast.error("End date must be later than the start date.");
       return false;
     }
 
     return true;
   };
 
-  const handleCreateElection = async (event) => {
+  const handleCreate = async (event) => {
     event.preventDefault();
 
     if (!validateForm()) return;
@@ -246,7 +134,7 @@ export default function ElectionsPage() {
         allowedVoterType: form.allowedVoterType,
       });
 
-      toast.success("Election created successfully");
+      toast.success("Election created successfully.");
       setForm(initialForm);
       await loadElections();
     } catch (error) {
@@ -256,189 +144,244 @@ export default function ElectionsPage() {
     }
   };
 
+  const handleFilterSubmit = async (event) => {
+    event.preventDefault();
+    await loadElections();
+  };
+
   return (
-    <section style={pageSectionStyle}>
-      <div style={pageHeaderStyle}>
-        <div>
-          <h1 style={{ margin: 0 }}>Elections</h1>
-          <p style={smallMutedStyle}>
-            Create, review, and track all elections from one place.
+    <section className="admin-crud">
+      <div className="admin-crud__hero">
+        <div className="admin-crud__hero-copy">
+          <span className="admin-crud__eyebrow">
+            <Vote size={14} />
+            Election lifecycle
+          </span>
+
+          <h2>
+            Create, publish, and monitor election timelines with full
+            administrative control.
+          </h2>
+
+          <p>
+            Election setup should remain structured and predictable. Define
+            titles, timelines, publication state, and voter access rules clearly
+            so that downstream voting and results workflows remain consistent.
           </p>
+        </div>
+
+        <div className="admin-crud__hero-grid">
+          <div className="admin-crud__hero-stat">
+            <span>Total shown</span>
+            <strong>{totalCount}</strong>
+          </div>
+          <div className="admin-crud__hero-stat">
+            <span>Published</span>
+            <strong>{publishedCount}</strong>
+          </div>
+          <div className="admin-crud__hero-stat">
+            <span>Active now</span>
+            <strong>{activeCount}</strong>
+          </div>
+          <div className="admin-crud__hero-stat">
+            <span>Status filter</span>
+            <strong>{statusFilter || "All"}</strong>
+          </div>
         </div>
       </div>
 
-      <div style={cardStyle}>
-        <h3 style={{ marginTop: 0 }}>Create Election</h3>
+      <div className="admin-crud__grid">
+        <div className="admin-crud__panel admin-crud__panel--sticky">
+          <div className="admin-crud__panel-header">
+            <div>
+              <h3>Create election</h3>
+              <p>
+                Configure the election details carefully before publishing it to
+                voters.
+              </p>
+            </div>
+            <span className="admin-crud__panel-badge">01</span>
+          </div>
 
-        <form
-          className="auth-form auth-form--grid"
-          onSubmit={handleCreateElection}
-        >
-          <div className="form-field">
-            <label className="form-label">Title</label>
-            <input
-              className="form-input"
+          <form className="admin-crud__form" onSubmit={handleCreate}>
+            <InputField
+              label="Election Title"
               name="title"
-              placeholder="Student Council Election 2026"
+              placeholder="Student Council General Election 2026"
               value={form.title}
               onChange={handleChange}
             />
-          </div>
 
-          <div className="form-field">
-            <label className="form-label">Allowed Voter Type</label>
-            <select
-              className="form-input"
-              name="allowedVoterType"
-              value={form.allowedVoterType}
-              onChange={handleChange}
-            >
-              <option value="verifiedOnly">Verified Only</option>
-              <option value="all">All</option>
-            </select>
-          </div>
+            <div className="form-field">
+              <label className="form-label">Description</label>
+              <textarea
+                className="admin-crud__textarea"
+                name="description"
+                placeholder="Provide a short description of the election purpose and scope."
+                value={form.description}
+                onChange={handleChange}
+              />
+            </div>
 
-          <div className="form-field" style={fullWidthStyle}>
-            <label className="form-label">Description</label>
-            <textarea
-              className="form-input"
-              name="description"
-              placeholder="Brief election description"
-              value={form.description}
-              onChange={handleChange}
-              style={{
-                minHeight: "110px",
-                paddingTop: "14px",
-                resize: "vertical",
-              }}
-            />
-          </div>
+            <div className="admin-crud__form-grid">
+              <InputField
+                label="Start Date & Time"
+                name="startDate"
+                type="datetime-local"
+                value={form.startDate}
+                onChange={handleChange}
+              />
 
-          <div className="form-field">
-            <label className="form-label">Start Date & Time</label>
-            <input
-              className="form-input"
-              type="datetime-local"
-              name="startDate"
-              value={form.startDate}
-              onChange={handleChange}
-            />
-          </div>
+              <InputField
+                label="End Date & Time"
+                name="endDate"
+                type="datetime-local"
+                value={form.endDate}
+                onChange={handleChange}
+              />
 
-          <div className="form-field">
-            <label className="form-label">End Date & Time</label>
-            <input
-              className="form-input"
-              type="datetime-local"
-              name="endDate"
-              value={form.endDate}
-              onChange={handleChange}
-            />
-          </div>
+              <div className="form-field">
+                <label className="form-label">Allowed Voter Type</label>
+                <select
+                  name="allowedVoterType"
+                  value={form.allowedVoterType}
+                  onChange={handleChange}
+                  className="admin-crud__select"
+                >
+                  <option value="verifiedOnly">Verified Only</option>
+                  <option value="all">All</option>
+                </select>
+              </div>
 
-          <label
-            style={{
-              ...fullWidthStyle,
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              color: "#d9e5f2",
-            }}
-          >
-            <input
-              type="checkbox"
-              name="isPublished"
-              checked={form.isPublished}
-              onChange={handleChange}
-            />
-            Publish immediately
-          </label>
+              <div className="admin-crud__switch-row">
+                <div className="admin-crud__switch-copy">
+                  <strong>Publish immediately</strong>
+                  <span>
+                    Leave unchecked if you want to save the election in draft
+                    mode first.
+                  </span>
+                </div>
 
-          <button
-            type="submit"
-            className="btn btn--primary"
-            disabled={createLoading}
-            style={fullWidthStyle}
-          >
-            {createLoading ? "Creating..." : "Create Election"}
-          </button>
-        </form>
-      </div>
+                <input
+                  className="admin-crud__checkbox"
+                  type="checkbox"
+                  name="isPublished"
+                  checked={form.isPublished}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
 
-      <div style={cardStyle}>
-        <div style={pageHeaderStyle}>
-          <div>
-            <h3 style={{ margin: 0 }}>Election List</h3>
-            <p style={smallMutedStyle}>{totalCount} total elections found</p>
-          </div>
+            <p className="admin-crud__inline-note">
+              Make sure the timeline is correct before publishing. Invalid
+              scheduling can disrupt the election flow.
+            </p>
 
-          <form onSubmit={handleFilterSubmit} style={actionsBarStyle}>
-            <input
-              className="form-input"
-              placeholder="Search by title or description"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              style={searchStyle}
-            />
-
-            <select
-              className="form-input"
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              style={{ minWidth: "160px" }}
-            >
-              <option value="">All Status</option>
-              <option value="upcoming">Upcoming</option>
-              <option value="active">Active</option>
-              <option value="ended">Ended</option>
-            </select>
-
-            <button
+            <Button
+              className="admin-crud__submit"
               type="submit"
-              className="btn btn--secondary"
-              style={{ width: "auto" }}
+              loading={createLoading}
             >
-              Apply
-            </button>
+              Create Election
+            </Button>
           </form>
         </div>
 
-        {loading ? (
-          <p style={smallMutedStyle}>Loading elections...</p>
-        ) : elections.length === 0 ? (
-          <p style={smallMutedStyle}>No elections found.</p>
-        ) : (
-          <div style={tableWrapperStyle}>
-            <div style={tableHeaderStyle}>
-              <span>Election</span>
-              <span>Status</span>
-              <span>Published</span>
-              <span>Start</span>
-              <span>End</span>
+        <div className="admin-crud__panel">
+          <div className="admin-crud__toolbar">
+            <div className="admin-crud__toolbar-left">
+              <h3 style={{ margin: 0 }}>Election list</h3>
+              <span className="admin-crud__meta">{totalCount} item(s)</span>
             </div>
 
-            {elections.map((election) => (
-              <div key={election._id} style={tableRowStyle}>
-                <div style={titleCellStyle}>
-                  <strong>{election.title}</strong>
-                  <span style={smallMutedStyle}>
-                    {election.description || "No description"}
-                  </span>
-                </div>
+            <form
+              className="admin-crud__toolbar-right"
+              onSubmit={handleFilterSubmit}
+            >
+              <InputField
+                className="admin-crud__search"
+                placeholder="Search election title"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
 
-                <div>
-                  <span style={getStatusBadgeStyle(election.status)}>
-                    {election.status || "upcoming"}
-                  </span>
-                </div>
+              <select
+                className="admin-crud__select"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+                style={{ minWidth: 150 }}
+              >
+                <option value="">All status</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="active">Active</option>
+                <option value="ended">Ended</option>
+              </select>
 
-                <div>{election.isPublished ? "Yes" : "No"}</div>
-                <div>{formatDateTime(election.startDate)}</div>
-                <div>{formatDateTime(election.endDate)}</div>
-              </div>
-            ))}
+              <Button type="submit" variant="secondary" loading={loading}>
+                Apply
+              </Button>
+            </form>
           </div>
-        )}
+
+          {loading ? (
+            <div className="admin-crud__empty">
+              <p>Loading elections...</p>
+            </div>
+          ) : elections.length === 0 ? (
+            <div className="admin-crud__empty">
+              <p>No elections are available for the current filters.</p>
+            </div>
+          ) : (
+            <div className="admin-crud__list">
+              {elections.map((election) => (
+                <article key={election._id} className="admin-crud__card">
+                  <div className="admin-crud__card-top">
+                    <div className="admin-crud__title-stack">
+                      <h4>{election.title}</h4>
+                      <p>
+                        {election.description || "No description provided."}
+                      </p>
+                    </div>
+
+                    <span className={getStatusClass(election.status)}>
+                      {election.status || "upcoming"}
+                    </span>
+                  </div>
+
+                  <div className="admin-crud__chips">
+                    <span className="admin-crud__chip">
+                      <CalendarRange size={14} />
+                      {formatDateTime(election.startDate)}
+                    </span>
+                    <span className="admin-crud__chip">
+                      <CalendarRange size={14} />
+                      {formatDateTime(election.endDate)}
+                    </span>
+                    <span
+                      className={`admin-crud__status ${
+                        election.isPublished
+                          ? "admin-crud__status--published"
+                          : "admin-crud__status--draft"
+                      }`}
+                    >
+                      {election.isPublished ? "Published" : "Draft"}
+                    </span>
+                    <span className="admin-crud__chip">
+                      <Globe2 size={14} />
+                      {election.allowedVoterType === "all"
+                        ? "All voters"
+                        : "Verified only"}
+                    </span>
+                    <span className="admin-crud__chip">
+                      <CheckCircle2 size={14} />
+                      ID: {election._id?.slice(-6)}
+                    </span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );

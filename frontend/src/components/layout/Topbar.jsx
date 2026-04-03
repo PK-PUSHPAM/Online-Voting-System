@@ -1,6 +1,14 @@
 import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
-import { Menu, Search, LogOut, ShieldCheck, UserCog, Bell } from "lucide-react";
+import {
+  Menu,
+  LogOut,
+  ShieldCheck,
+  UserCog,
+  Bell,
+  BadgeCheck,
+  Activity,
+} from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 
 const pageMetaMap = {
@@ -70,6 +78,7 @@ export default function Topbar({ onOpenSidebar = () => {} }) {
 
   const role = String(user?.role || "").toLowerCase();
   const isSuperAdmin = role === "super_admin" || role === "superadmin";
+  const isActive = user?.isActive !== false;
 
   const initials = useMemo(() => {
     const name = String(user?.fullName || "User").trim();
@@ -102,15 +111,11 @@ export default function Topbar({ onOpenSidebar = () => {} }) {
       </div>
 
       <div className="admin-topbar__right">
-        <div className="admin-topbar__search">
-          <Search size={16} />
-          <input type="text" placeholder="Search UI module later..." disabled />
-        </div>
-
         <button
           type="button"
           className="admin-topbar__ghost-btn"
           aria-label="Notifications"
+          title="Notifications"
         >
           <Bell size={18} />
         </button>
@@ -133,6 +138,17 @@ export default function Topbar({ onOpenSidebar = () => {} }) {
                 </>
               )}
             </span>
+          </div>
+        </div>
+
+        <div className="admin-topbar__profile">
+          <div className="admin-topbar__avatar">
+            {isActive ? <BadgeCheck size={16} /> : <Activity size={16} />}
+          </div>
+
+          <div className="admin-topbar__profile-text">
+            <strong>{isActive ? "Account Active" : "Account Limited"}</strong>
+            <span>{user?.email || "No email available"}</span>
           </div>
         </div>
 

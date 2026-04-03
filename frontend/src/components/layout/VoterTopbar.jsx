@@ -7,6 +7,8 @@ import {
   Clock3,
   BadgeCheck,
   UserCircle2,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -35,6 +37,11 @@ const pageMetaMap = {
     description:
       "Track approval state, eligibility checks, and account readiness before voting.",
   },
+};
+
+const formatVerificationLabel = (status) => {
+  const value = String(status || "pending");
+  return value.charAt(0).toUpperCase() + value.slice(1);
 };
 
 export default function VoterTopbar({ onOpenSidebar = () => {} }) {
@@ -72,9 +79,9 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
     return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
   }, [user?.fullName]);
 
-  const verificationStatus = String(user?.verificationStatus || "pending");
-  const verificationLabel =
-    verificationStatus.charAt(0).toUpperCase() + verificationStatus.slice(1);
+  const verificationLabel = formatVerificationLabel(user?.verificationStatus);
+  const isEligible = Boolean(user?.isEligibleToVote);
+  const isMobileVerified = Boolean(user?.mobileVerified);
 
   return (
     <header className="admin-topbar voter-topbar">
@@ -103,13 +110,13 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
           </span>
 
           <span className="voter-topbar__pill">
-            <BadgeCheck size={14} />
-            {user?.isEligibleToVote ? "Eligible" : "Not Eligible"}
+            {isEligible ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+            {isEligible ? "Eligible to Vote" : "Not Eligible"}
           </span>
 
           <span className="voter-topbar__pill">
             <Clock3 size={14} />
-            {user?.mobileVerified ? "Mobile Verified" : "Mobile Pending"}
+            {isMobileVerified ? "Mobile Verified" : "Mobile Pending"}
           </span>
         </div>
 
@@ -122,6 +129,17 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
               <UserCircle2 size={14} />
               Voter
             </span>
+          </div>
+        </div>
+
+        <div className="admin-topbar__profile">
+          <div className="admin-topbar__avatar">
+            <BadgeCheck size={16} />
+          </div>
+
+          <div className="admin-topbar__profile-text">
+            <strong>{user?.email || "No email available"}</strong>
+            <span>{user?.mobileNumber || "No mobile number available"}</span>
           </div>
         </div>
 

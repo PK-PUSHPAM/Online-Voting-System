@@ -11,12 +11,15 @@ import {
   ShieldCheck,
   UserCircle2,
   Vote,
+  RefreshCcw,
+  FileText,
 } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { voterService } from "../../services/voter.service";
 import { voteService } from "../../services/vote.service";
 import { APP_ROUTES, buildVoterElectionDetailsRoute } from "../../lib/routes";
 import { getApiErrorMessage } from "../../lib/utils";
+import "../../styles/voter.css";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -35,28 +38,29 @@ function getReadiness(user) {
   if (!user?.mobileVerified) {
     return {
       canVote: false,
-      message: "Mobile verification is pending.",
+      message: "Your mobile number must be verified before you can vote.",
     };
   }
 
   if (!user?.ageVerified) {
     return {
       canVote: false,
-      message: "Age verification is pending.",
+      message: "Your age verification is still pending.",
     };
   }
 
   if (!user?.isEligibleToVote) {
     return {
       canVote: false,
-      message: "Your account is not eligible to vote.",
+      message: "Your account is not currently eligible to vote.",
     };
   }
 
   if (String(user?.verificationStatus || "").toLowerCase() !== "approved") {
     return {
       canVote: false,
-      message: "Admin approval is pending or rejected.",
+      message:
+        "Administrative approval is still required before voting is enabled.",
     };
   }
 
@@ -106,6 +110,9 @@ export default function VoterElectionDetailsPage() {
       );
     } catch (error) {
       toast.error(getApiErrorMessage(error));
+      setElection(null);
+      setPosts([]);
+      setVotes([]);
     } finally {
       setLoading(false);
     }
@@ -139,6 +146,14 @@ export default function VoterElectionDetailsPage() {
     return map;
   }, [votes]);
 
+  const totalRemainingVotes = useMemo(() => {
+    return posts.reduce((sum, post) => {
+      const used = votesByPost.get(post._id)?.count || 0;
+      const maxVotes = Number(post?.maxVotesPerVoter || 1);
+      return sum + Math.max(maxVotes - used, 0);
+    }, 0);
+  }, [posts, votesByPost]);
+
   const handleVote = async ({ postId, candidateId }) => {
     if (!readiness.canVote) {
       toast.error(readiness.message);
@@ -156,7 +171,7 @@ export default function VoterElectionDetailsPage() {
         candidateId,
       });
 
-      toast.success(response?.message || "Vote cast successfully");
+      toast.success(response?.message || "Vote submitted successfully.");
       await loadElectionPage();
     } catch (error) {
       toast.error(getApiErrorMessage(error));
@@ -174,10 +189,10 @@ export default function VoterElectionDetailsPage() {
             Back to elections
           </Link>
 
-          <h2>{election?.title || "Election Voting"}</h2>
+          <h2>{election?.title || "Election Details"}</h2>
           <p>
-            Ye page real ballot room hai. Yahin se post-wise candidate select
-            karke vote cast hoga.
+            Review the posts and candidates available in this election before
+            submitting your vote.
           </p>
         </div>
       </div>
@@ -186,7 +201,7 @@ export default function VoterElectionDetailsPage() {
         <section className="voter-alert voter-alert--warning">
           <AlertTriangle size={18} />
           <div>
-            <strong>Voting is currently blocked</strong>
+            <strong>Voting is currently unavailable</strong>
             <p>{readiness.message}</p>
           </div>
         </section>
@@ -196,20 +211,25 @@ export default function VoterElectionDetailsPage() {
         <div className="voter-empty-state voter-empty-state--lg">
           Loading election details...
         </div>
+      ) : !election ? (
+        <div className="voter-empty-state voter-empty-state--lg">
+          Election details are not available in the current active election
+          feed.
+        </div>
       ) : (
         <>
           <section className="voter-election-hero">
             <div className="voter-election-hero__main">
               <span className="voter-hero__badge">
                 <Vote size={14} />
-                Active ballot
+                Active Ballot
               </span>
 
-              <h3>{election?.title || "Election details loaded"}</h3>
+              <h3>{election?.title || "Election details"}</h3>
 
               <p>
                 {election?.description ||
-                  "Election description was not found in the active election payload."}
+                  "No election description is available at the moment."}
               </p>
 
               <div className="voter-election-hero__meta">
@@ -242,8 +262,13 @@ export default function VoterElectionDetailsPage() {
               </div>
 
               <div className="voter-mini-card">
-                <span>Account State</span>
-                <strong>{readiness.canVote ? "Ready" : "Blocked"}</strong>
+                <span>Remaining Vote Capacity</span>
+                <strong>{totalRemainingVotes}</strong>
+              </div>
+
+              <div className="voter-mini-card">
+                <span>Account Status</span>
+                <strong>{readiness.canVote ? "Ready" : "Restricted"}</strong>
               </div>
             </div>
           </section>
@@ -259,7 +284,7 @@ export default function VoterElectionDetailsPage() {
                 const usedVotes = postVoteData.count;
                 const maxVotes = Number(post?.maxVotesPerVoter || 1);
                 const remainingVotes = Math.max(maxVotes - usedVotes, 0);
-                const approvedCandidates = Array.isArray(post?.candidates)
+                const candidates = Array.isArray(post?.candidates)
                   ? post.candidates
                   : [];
 
@@ -270,7 +295,7 @@ export default function VoterElectionDetailsPage() {
                         <h3>{post.title}</h3>
                         <p>
                           {post.description ||
-                            "No post description is available for this ballot section."}
+                            "No description is available for this post."}
                         </p>
                       </div>
 
@@ -292,9 +317,9 @@ export default function VoterElectionDetailsPage() {
                       </div>
                     </div>
 
-                    {approvedCandidates.length ? (
+                    {candidates.length ? (
                       <div className="voter-candidate-grid">
-                        {approvedCandidates.map((candidate) => {
+                        {candidates.map((candidate) => {
                           const alreadyVotedForCandidate =
                             postVoteData.candidateIds.has(candidate._id);
 
@@ -310,14 +335,14 @@ export default function VoterElectionDetailsPage() {
                             alreadyVotedForCandidate ||
                             remainingVotes <= 0;
 
-                          let voteLabel = "Vote now";
+                          let voteLabel = "Submit Vote";
 
                           if (!candidateApproved) {
-                            voteLabel = "Pending approval";
+                            voteLabel = "Approval Pending";
                           } else if (alreadyVotedForCandidate) {
-                            voteLabel = "Already voted";
+                            voteLabel = "Already Voted";
                           } else if (remainingVotes <= 0) {
-                            voteLabel = "Vote limit reached";
+                            voteLabel = "Vote Limit Reached";
                           }
 
                           const buttonKey = `${post._id}:${candidate._id}`;
@@ -350,16 +375,6 @@ export default function VoterElectionDetailsPage() {
                                 </div>
                               </div>
 
-                              {candidate?.bio ? (
-                                <p className="voter-candidate-card__bio">
-                                  {candidate.bio}
-                                </p>
-                              ) : (
-                                <p className="voter-candidate-card__bio">
-                                  No candidate bio added yet.
-                                </p>
-                              )}
-
                               <div className="voter-candidate-card__badges">
                                 <span className="voter-tag">
                                   {candidate?.partyName || "Independent"}
@@ -377,9 +392,22 @@ export default function VoterElectionDetailsPage() {
 
                                 {alreadyVotedForCandidate ? (
                                   <span className="voter-tag voter-tag--soft">
-                                    Your vote recorded
+                                    Vote recorded
                                   </span>
                                 ) : null}
+                              </div>
+
+                              <div className="voter-candidate-card__manifesto">
+                                <div className="voter-candidate-card__manifesto-title">
+                                  <FileText size={15} />
+                                  <strong>Manifesto</strong>
+                                </div>
+
+                                <p className="voter-candidate-card__bio">
+                                  {candidate?.manifesto ||
+                                    candidate?.bio ||
+                                    "No manifesto or profile summary is available."}
+                                </p>
                               </div>
 
                               <button
@@ -401,7 +429,7 @@ export default function VoterElectionDetailsPage() {
                       </div>
                     ) : (
                       <div className="voter-empty-state">
-                        No candidates are available in this post right now.
+                        No candidates are currently available for this post.
                       </div>
                     )}
                   </section>
@@ -410,15 +438,17 @@ export default function VoterElectionDetailsPage() {
             </div>
           ) : (
             <div className="voter-empty-state voter-empty-state--lg">
-              This election has no active posts for the voter side yet.
+              No active posts are currently available in this election.
             </div>
           )}
 
           <section className="voter-panel">
             <div className="voter-panel__header">
               <div>
-                <h3>Quick Exit Paths</h3>
-                <p>Keep navigation obvious. Hidden navigation is bad UX.</p>
+                <h3>Quick Navigation</h3>
+                <p>
+                  Use these shortcuts to move between election-related pages.
+                </p>
               </div>
             </div>
 
@@ -434,7 +464,8 @@ export default function VoterElectionDetailsPage() {
                 className="voter-secondary-btn"
                 to={buildVoterElectionDetailsRoute(electionId)}
               >
-                Refresh this ballot
+                <RefreshCcw size={15} />
+                Refresh this page
               </Link>
 
               <Link

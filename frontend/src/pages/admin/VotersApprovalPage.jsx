@@ -1,83 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  CheckCircle2,
+  Clock3,
+  ShieldCheck,
+  Users,
+  XCircle,
+} from "lucide-react";
 import { toast } from "react-hot-toast";
+import Button from "../../components/common/Button";
+import InputField from "../../components/common/InputField";
 import { userService } from "../../services/user.service";
 import { getApiErrorMessage } from "../../lib/utils";
+import "../../styles/admin-crud.css";
 
-const sectionStyle = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "20px",
-};
-
-const headerStyle = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: "16px",
-  flexWrap: "wrap",
-};
-
-const cardStyle = {
-  padding: "20px",
-  borderRadius: "18px",
-  background: "rgba(255,255,255,0.04)",
-  border: "1px solid rgba(255,255,255,0.08)",
-};
-
-const filterRowStyle = {
-  display: "flex",
-  gap: "12px",
-  flexWrap: "wrap",
-  alignItems: "center",
-};
-
-const tableHeaderStyle = {
-  display: "grid",
-  gridTemplateColumns: "1.4fr 1.5fr 1fr 1fr 1.1fr",
-  gap: "12px",
-  padding: "0 6px",
-  color: "#97a6ba",
-  fontSize: "13px",
-};
-
-const rowStyle = {
-  display: "grid",
-  gridTemplateColumns: "1.4fr 1.5fr 1fr 1fr 1.1fr",
-  gap: "12px",
-  padding: "16px",
-  borderRadius: "14px",
-  background: "rgba(255,255,255,0.05)",
-  border: "1px solid rgba(255,255,255,0.06)",
-  alignItems: "center",
-};
-
-const titleStackStyle = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "6px",
-};
-
-const actionsStyle = {
-  display: "flex",
-  gap: "10px",
-  flexWrap: "wrap",
-};
-
-const mutedTextStyle = {
-  margin: 0,
-  color: "#97a6ba",
-  fontSize: "14px",
-};
-
-function formatDob(value) {
+const formatDob = (value) => {
   if (!value) return "-";
-
   const date = new Date(value);
-
   if (Number.isNaN(date.getTime())) return "-";
-
   return date.toLocaleDateString();
-}
+};
 
 export default function VotersApprovalPage() {
   const [voters, setVoters] = useState([]);
@@ -86,9 +27,19 @@ export default function VotersApprovalPage() {
   const [rowActionId, setRowActionId] = useState("");
   const [search, setSearch] = useState("");
 
-  const totalCount = useMemo(
+  const totalPending = useMemo(
     () => pagination?.totalItems || voters.length || 0,
     [pagination, voters.length],
+  );
+
+  const mobileVerifiedCount = useMemo(
+    () => voters.filter((item) => item.mobileVerified).length,
+    [voters],
+  );
+
+  const ageVerifiedCount = useMemo(
+    () => voters.filter((item) => item.ageVerified).length,
+    [voters],
   );
 
   const loadPendingVoters = async () => {
@@ -97,7 +48,7 @@ export default function VotersApprovalPage() {
 
       const data = await userService.getPendingVoters({
         page: 1,
-        limit: 20,
+        limit: 50,
         ...(search.trim() ? { search: search.trim() } : {}),
       });
 
@@ -116,16 +67,11 @@ export default function VotersApprovalPage() {
     loadPendingVoters();
   }, []);
 
-  const handleFilterSubmit = async (event) => {
-    event.preventDefault();
-    await loadPendingVoters();
-  };
-
   const handleApprove = async (userId) => {
     try {
       setRowActionId(userId);
       await userService.approve(userId, {});
-      toast.success("Voter approved successfully");
+      toast.success("Voter approved successfully.");
       await loadPendingVoters();
     } catch (error) {
       toast.error(getApiErrorMessage(error));
@@ -138,7 +84,7 @@ export default function VotersApprovalPage() {
     try {
       setRowActionId(userId);
       await userService.reject(userId, {});
-      toast.success("Voter rejected successfully");
+      toast.success("Voter rejected successfully.");
       await loadPendingVoters();
     } catch (error) {
       toast.error(getApiErrorMessage(error));
@@ -147,116 +93,157 @@ export default function VotersApprovalPage() {
     }
   };
 
+  const handleSearch = async (event) => {
+    event.preventDefault();
+    await loadPendingVoters();
+  };
+
   return (
-    <section style={sectionStyle}>
-      <div style={headerStyle}>
-        <div>
-          <h1 style={{ margin: 0 }}>Pending Voters</h1>
-          <p style={mutedTextStyle}>
-            Review new voter registrations and approve only valid users.
+    <section className="admin-crud">
+      <div className="admin-crud__hero">
+        <div className="admin-crud__hero-copy">
+          <span className="admin-crud__eyebrow">
+            <Users size={14} />
+            Verification queue
+          </span>
+
+          <h2>
+            Review pending voter registrations and approve only accounts that
+            meet verification requirements.
+          </h2>
+
+          <p>
+            This queue should help administrators validate voter details quickly
+            and consistently. Review identity fields, verification flags, and
+            account readiness before approving access to the voting system.
           </p>
+        </div>
+
+        <div className="admin-crud__hero-grid">
+          <div className="admin-crud__hero-stat">
+            <span>Total pending</span>
+            <strong>{totalPending}</strong>
+          </div>
+          <div className="admin-crud__hero-stat">
+            <span>Mobile verified</span>
+            <strong>{mobileVerifiedCount}</strong>
+          </div>
+          <div className="admin-crud__hero-stat">
+            <span>Age verified</span>
+            <strong>{ageVerifiedCount}</strong>
+          </div>
+          <div className="admin-crud__hero-stat">
+            <span>Search state</span>
+            <strong>{search.trim() || "All"}</strong>
+          </div>
         </div>
       </div>
 
-      <div style={cardStyle}>
-        <div style={headerStyle}>
-          <div>
-            <h3 style={{ margin: 0 }}>Approval Queue</h3>
-            <p style={mutedTextStyle}>{totalCount} pending voters found</p>
+      <div className="admin-crud__panel">
+        <div className="admin-crud__toolbar">
+          <div className="admin-crud__toolbar-left">
+            <h3 style={{ margin: 0 }}>Pending voters</h3>
+            <span className="admin-crud__meta">{totalPending} item(s)</span>
           </div>
 
-          <form onSubmit={handleFilterSubmit} style={filterRowStyle}>
-            <input
-              className="form-input"
-              placeholder="Search by name, email, mobile"
+          <form className="admin-crud__toolbar-right" onSubmit={handleSearch}>
+            <InputField
+              className="admin-crud__search"
+              placeholder="Search by voter name, email, or mobile"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              style={{ minWidth: "260px" }}
             />
 
-            <button
-              type="submit"
-              className="btn btn--secondary"
-              style={{ width: "auto" }}
-            >
+            <Button type="submit" variant="secondary" loading={loading}>
               Search
-            </button>
+            </Button>
           </form>
         </div>
 
         {loading ? (
-          <p style={mutedTextStyle}>Loading pending voters...</p>
+          <div className="admin-crud__empty">
+            <p>Loading pending voters...</p>
+          </div>
         ) : voters.length === 0 ? (
-          <p style={mutedTextStyle}>No pending voters found.</p>
+          <div className="admin-crud__empty">
+            <p>No pending voters are available for the current search.</p>
+          </div>
         ) : (
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
-          >
-            <div style={tableHeaderStyle}>
-              <span>Voter</span>
-              <span>Contact</span>
-              <span>DOB</span>
-              <span>Eligibility</span>
-              <span>Actions</span>
-            </div>
-
+          <div className="admin-crud__list">
             {voters.map((user) => {
               const isBusy = rowActionId === user._id;
 
               return (
-                <div key={user._id} style={rowStyle}>
-                  <div style={titleStackStyle}>
-                    <strong>{user.fullName}</strong>
-                    <span style={mutedTextStyle}>
-                      ID: {user.internalVoterId || "Not assigned"}
+                <article key={user._id} className="admin-crud__card">
+                  <div className="admin-crud__card-top">
+                    <div className="admin-crud__title-stack">
+                      <h4>{user.fullName}</h4>
+                      <p>ID: {user.internalVoterId || "Not assigned yet"}</p>
+                    </div>
+
+                    <span className="admin-crud__status admin-crud__status--pending">
+                      Pending
                     </span>
                   </div>
 
-                  <div style={titleStackStyle}>
-                    <span>{user.email || "-"}</span>
-                    <span style={mutedTextStyle}>
-                      {user.mobileNumber || "-"}
+                  <div className="admin-crud__chips">
+                    <span className="admin-crud__chip">
+                      {user.email || "No email"}
                     </span>
-                  </div>
-
-                  <div>{formatDob(user.dob)}</div>
-
-                  <div style={titleStackStyle}>
-                    <span>
-                      Age: {user.ageVerified ? "Verified" : "Not Verified"}
+                    <span className="admin-crud__chip">
+                      {user.mobileNumber || "No mobile number"}
                     </span>
-                    <span style={mutedTextStyle}>
+                    <span className="admin-crud__chip">
+                      <Clock3 size={14} />
+                      DOB: {formatDob(user.dob)}
+                    </span>
+                    <span className="admin-crud__chip">
+                      <ShieldCheck size={14} />
                       Mobile:{" "}
-                      {user.mobileVerified ? "Verified" : "Not Verified"}
+                      {user.mobileVerified ? "Verified" : "Not verified"}
+                    </span>
+                    <span className="admin-crud__chip">
+                      <CheckCircle2 size={14} />
+                      Age: {user.ageVerified ? "Verified" : "Not verified"}
                     </span>
                   </div>
 
-                  <div style={actionsStyle}>
-                    <button
-                      className="btn btn--primary"
-                      style={{ width: "auto", minWidth: "96px" }}
+                  <div className="admin-crud__actions">
+                    <Button
+                      variant="primary"
                       onClick={() => handleApprove(user._id)}
                       disabled={isBusy}
                     >
                       {isBusy ? "Please wait..." : "Approve"}
-                    </button>
+                    </Button>
 
-                    <button
-                      className="btn btn--secondary"
-                      style={{
-                        width: "auto",
-                        minWidth: "96px",
-                        background: "rgba(239,68,68,0.14)",
-                        color: "#fca5a5",
-                        border: "1px solid rgba(239,68,68,0.25)",
-                      }}
+                    <Button
+                      variant="danger"
                       onClick={() => handleReject(user._id)}
                       disabled={isBusy}
                     >
                       {isBusy ? "Please wait..." : "Reject"}
-                    </button>
+                    </Button>
                   </div>
-                </div>
+
+                  {(!user.mobileVerified || !user.ageVerified) && (
+                    <p
+                      className="admin-crud__inline-note"
+                      style={{ marginTop: 12 }}
+                    >
+                      <XCircle
+                        size={14}
+                        style={{
+                          display: "inline",
+                          verticalAlign: "middle",
+                          marginRight: 6,
+                        }}
+                      />
+                      This account still has incomplete verification flags.
+                      Review carefully before approval.
+                    </p>
+                  )}
+                </article>
               );
             })}
           </div>

@@ -1,55 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { Briefcase, ListOrdered, Vote } from "lucide-react";
 import { toast } from "react-hot-toast";
+import Button from "../../components/common/Button";
+import InputField from "../../components/common/InputField";
 import { electionService } from "../../services/election.service";
 import { postService } from "../../services/post.service";
 import { getApiErrorMessage } from "../../lib/utils";
-
-const sectionStyle = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "20px",
-};
-
-const headerStyle = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: "16px",
-  flexWrap: "wrap",
-};
-
-const cardStyle = {
-  padding: "20px",
-  borderRadius: "18px",
-  background: "rgba(255,255,255,0.04)",
-  border: "1px solid rgba(255,255,255,0.08)",
-};
-
-const rowStyle = {
-  display: "grid",
-  gridTemplateColumns: "1.7fr 1fr 0.8fr 0.8fr",
-  gap: "12px",
-  padding: "16px",
-  borderRadius: "14px",
-  background: "rgba(255,255,255,0.05)",
-  border: "1px solid rgba(255,255,255,0.06)",
-  alignItems: "center",
-};
-
-const headerRowStyle = {
-  display: "grid",
-  gridTemplateColumns: "1.7fr 1fr 0.8fr 0.8fr",
-  gap: "12px",
-  padding: "0 6px",
-  color: "#97a6ba",
-  fontSize: "13px",
-};
-
-const mutedStyle = {
-  margin: 0,
-  color: "#97a6ba",
-  fontSize: "14px",
-};
+import "../../styles/admin-crud.css";
 
 const initialForm = {
   title: "",
@@ -67,11 +24,22 @@ export default function PostsManagementPage() {
   const [loadingElections, setLoadingElections] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
+  const [activeFilter, setActiveFilter] = useState("");
   const [form, setForm] = useState(initialForm);
+
+  const selectedElection = useMemo(
+    () => elections.find((item) => item._id === selectedElectionId) || null,
+    [elections, selectedElectionId],
+  );
 
   const totalPosts = useMemo(
     () => pagination?.totalItems || posts.length || 0,
     [pagination, posts.length],
+  );
+
+  const activePosts = useMemo(
+    () => posts.filter((item) => item.isActive).length,
+    [posts],
   );
 
   const loadElections = async () => {
@@ -101,9 +69,11 @@ export default function PostsManagementPage() {
 
     try {
       setLoadingPosts(true);
+
       const data = await postService.getByElection(electionId, {
         page: 1,
         limit: 50,
+        ...(activeFilter === "" ? {} : { isActive: activeFilter === "active" }),
       });
 
       setPosts(Array.isArray(data?.items) ? data.items : []);
@@ -125,7 +95,7 @@ export default function PostsManagementPage() {
     if (selectedElectionId) {
       loadPosts(selectedElectionId);
     }
-  }, [selectedElectionId]);
+  }, [selectedElectionId, activeFilter]);
 
   const handleFormChange = (event) => {
     const { name, value, type, checked } = event.target;
@@ -140,12 +110,12 @@ export default function PostsManagementPage() {
     event.preventDefault();
 
     if (!selectedElectionId) {
-      toast.error("Select an election first");
+      toast.error("Please select an election first.");
       return;
     }
 
     if (!form.title.trim()) {
-      toast.error("Post title is required");
+      toast.error("Post title is required.");
       return;
     }
 
@@ -160,7 +130,7 @@ export default function PostsManagementPage() {
         isActive: form.isActive,
       });
 
-      toast.success("Post created successfully");
+      toast.success("Post created successfully.");
       setForm(initialForm);
       await loadPosts(selectedElectionId);
     } catch (error) {
@@ -171,168 +141,221 @@ export default function PostsManagementPage() {
   };
 
   return (
-    <section style={sectionStyle}>
-      <div style={headerStyle}>
-        <div>
-          <h1 style={{ margin: 0 }}>Posts Management</h1>
-          <p style={mutedStyle}>
-            Create and organize positions for each election.
+    <section className="admin-crud">
+      <div className="admin-crud__hero">
+        <div className="admin-crud__hero-copy">
+          <span className="admin-crud__eyebrow">
+            <Briefcase size={14} />
+            Position structure
+          </span>
+
+          <h2>
+            Define election posts clearly so ballot structure remains consistent
+            and easy to manage.
+          </h2>
+
+          <p>
+            Posts determine how candidates are organized within an election.
+            Clear titles, voting limits, and ordering rules help ensure that the
+            ballot remains understandable for both administrators and voters.
           </p>
         </div>
-      </div>
 
-      <div style={cardStyle}>
-        <h3 style={{ marginTop: 0 }}>Select Election</h3>
-
-        <div className="form-field">
-          <label className="form-label">Election</label>
-          <select
-            className="form-input"
-            value={selectedElectionId}
-            onChange={(event) => setSelectedElectionId(event.target.value)}
-            disabled={loadingElections}
-          >
-            <option value="">Select election</option>
-            {elections.map((election) => (
-              <option key={election._id} value={election._id}>
-                {election.title}
-              </option>
-            ))}
-          </select>
+        <div className="admin-crud__hero-grid">
+          <div className="admin-crud__hero-stat">
+            <span>Selected election</span>
+            <strong>
+              {selectedElection ? selectedElection.title.slice(0, 18) : "None"}
+            </strong>
+          </div>
+          <div className="admin-crud__hero-stat">
+            <span>Total posts</span>
+            <strong>{totalPosts}</strong>
+          </div>
+          <div className="admin-crud__hero-stat">
+            <span>Active posts</span>
+            <strong>{activePosts}</strong>
+          </div>
+          <div className="admin-crud__hero-stat">
+            <span>Current filter</span>
+            <strong>{activeFilter || "All"}</strong>
+          </div>
         </div>
       </div>
 
-      <div style={cardStyle}>
-        <h3 style={{ marginTop: 0 }}>Create Post</h3>
+      <div className="admin-crud__grid">
+        <div className="admin-crud__panel admin-crud__panel--sticky">
+          <div className="admin-crud__panel-header">
+            <div>
+              <h3>Create post</h3>
+              <p>
+                Add a structured position or post under the selected election.
+              </p>
+            </div>
+            <span className="admin-crud__panel-badge">02</span>
+          </div>
 
-        <form className="auth-form auth-form--grid" onSubmit={handleCreate}>
-          <div className="form-field">
-            <label className="form-label">Post Title</label>
-            <input
-              className="form-input"
+          <form className="admin-crud__form" onSubmit={handleCreate}>
+            <div className="form-field">
+              <label className="form-label">Election</label>
+              <select
+                className="admin-crud__select"
+                value={selectedElectionId}
+                onChange={(event) => setSelectedElectionId(event.target.value)}
+                disabled={loadingElections || elections.length === 0}
+              >
+                {elections.length === 0 ? (
+                  <option value="">No elections found</option>
+                ) : (
+                  elections.map((election) => (
+                    <option key={election._id} value={election._id}>
+                      {election.title}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            <InputField
+              label="Post Title"
               name="title"
-              placeholder="President"
+              placeholder="President, General Secretary, Cultural Head"
               value={form.title}
               onChange={handleFormChange}
             />
-          </div>
 
-          <div className="form-field">
-            <label className="form-label">Max Votes Per Voter</label>
-            <input
-              className="form-input"
-              type="number"
-              min="1"
-              max="10"
-              name="maxVotesPerVoter"
-              value={form.maxVotesPerVoter}
-              onChange={handleFormChange}
-            />
-          </div>
-
-          <div className="form-field" style={{ gridColumn: "1 / -1" }}>
-            <label className="form-label">Description</label>
-            <textarea
-              className="form-input"
-              name="description"
-              placeholder="Describe this post"
-              value={form.description}
-              onChange={handleFormChange}
-              style={{
-                minHeight: "110px",
-                paddingTop: "14px",
-                resize: "vertical",
-              }}
-            />
-          </div>
-
-          <div className="form-field">
-            <label className="form-label">Display Order</label>
-            <input
-              className="form-input"
-              type="number"
-              min="0"
-              name="displayOrder"
-              value={form.displayOrder}
-              onChange={handleFormChange}
-            />
-          </div>
-
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              color: "#d9e5f2",
-            }}
-          >
-            <input
-              type="checkbox"
-              name="isActive"
-              checked={form.isActive}
-              onChange={handleFormChange}
-            />
-            Active
-          </label>
-
-          <button
-            type="submit"
-            className="btn btn--primary"
-            disabled={createLoading}
-            style={{ gridColumn: "1 / -1" }}
-          >
-            {createLoading ? "Creating..." : "Create Post"}
-          </button>
-        </form>
-      </div>
-
-      <div style={cardStyle}>
-        <div style={headerStyle}>
-          <div>
-            <h3 style={{ margin: 0 }}>Posts List</h3>
-            <p style={mutedStyle}>{totalPosts} posts found</p>
-          </div>
-        </div>
-
-        {!selectedElectionId ? (
-          <p style={mutedStyle}>Select an election to view posts.</p>
-        ) : loadingPosts ? (
-          <p style={mutedStyle}>Loading posts...</p>
-        ) : posts.length === 0 ? (
-          <p style={mutedStyle}>No posts found for this election.</p>
-        ) : (
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
-          >
-            <div style={headerRowStyle}>
-              <span>Post</span>
-              <span>Votes Limit</span>
-              <span>Order</span>
-              <span>Status</span>
+            <div className="form-field">
+              <label className="form-label">Description</label>
+              <textarea
+                className="admin-crud__textarea"
+                name="description"
+                placeholder="Provide a short description of the role or responsibility."
+                value={form.description}
+                onChange={handleFormChange}
+              />
             </div>
 
-            {posts.map((post) => (
-              <div key={post._id} style={rowStyle}>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "6px",
-                  }}
-                >
-                  <strong>{post.title}</strong>
-                  <span style={mutedStyle}>
-                    {post.description || "No description"}
-                  </span>
-                </div>
+            <div className="admin-crud__form-grid">
+              <InputField
+                label="Max Votes Per Voter"
+                name="maxVotesPerVoter"
+                type="number"
+                min="1"
+                max="10"
+                value={form.maxVotesPerVoter}
+                onChange={handleFormChange}
+              />
 
-                <div>{post.maxVotesPerVoter ?? 1}</div>
-                <div>{post.displayOrder ?? 0}</div>
-                <div>{post.isActive ? "Active" : "Inactive"}</div>
+              <InputField
+                label="Display Order"
+                name="displayOrder"
+                type="number"
+                min="0"
+                value={form.displayOrder}
+                onChange={handleFormChange}
+              />
+            </div>
+
+            <div className="admin-crud__switch-row">
+              <div className="admin-crud__switch-copy">
+                <strong>Mark post as active</strong>
+                <span>
+                  Inactive posts remain in the system but should not appear in
+                  active voting flows.
+                </span>
               </div>
-            ))}
+
+              <input
+                className="admin-crud__checkbox"
+                type="checkbox"
+                name="isActive"
+                checked={form.isActive}
+                onChange={handleFormChange}
+              />
+            </div>
+
+            <Button
+              className="admin-crud__submit"
+              type="submit"
+              loading={createLoading}
+            >
+              Create Post
+            </Button>
+          </form>
+        </div>
+
+        <div className="admin-crud__panel">
+          <div className="admin-crud__toolbar">
+            <div className="admin-crud__toolbar-left">
+              <h3 style={{ margin: 0 }}>Posts list</h3>
+              <span className="admin-crud__meta">{totalPosts} item(s)</span>
+            </div>
+
+            <div className="admin-crud__toolbar-right">
+              <select
+                className="admin-crud__select"
+                value={activeFilter}
+                onChange={(event) => setActiveFilter(event.target.value)}
+                style={{ minWidth: 150 }}
+              >
+                <option value="">All posts</option>
+                <option value="active">Active only</option>
+                <option value="inactive">Inactive only</option>
+              </select>
+            </div>
           </div>
-        )}
+
+          {!selectedElectionId ? (
+            <div className="admin-crud__empty">
+              <p>Please select an election to view and manage its posts.</p>
+            </div>
+          ) : loadingPosts ? (
+            <div className="admin-crud__empty">
+              <p>Loading posts...</p>
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="admin-crud__empty">
+              <p>No posts are available for the selected election.</p>
+            </div>
+          ) : (
+            <div className="admin-crud__list">
+              {posts.map((post) => (
+                <article key={post._id} className="admin-crud__card">
+                  <div className="admin-crud__card-top">
+                    <div className="admin-crud__title-stack">
+                      <h4>{post.title}</h4>
+                      <p>{post.description || "No description provided."}</p>
+                    </div>
+
+                    <span
+                      className={`admin-crud__status ${
+                        post.isActive
+                          ? "admin-crud__status--active"
+                          : "admin-crud__status--inactive"
+                      }`}
+                    >
+                      {post.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+
+                  <div className="admin-crud__chips">
+                    <span className="admin-crud__chip">
+                      <Vote size={14} />
+                      Max votes: {post.maxVotesPerVoter}
+                    </span>
+                    <span className="admin-crud__chip">
+                      <ListOrdered size={14} />
+                      Display order: {post.displayOrder ?? 0}
+                    </span>
+                    <span className="admin-crud__chip">
+                      Election: {selectedElection?.title || "Unknown"}
+                    </span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );

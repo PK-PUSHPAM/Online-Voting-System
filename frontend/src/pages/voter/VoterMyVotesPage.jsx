@@ -1,21 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
-import { CheckCircle2, Vote, Layers3 } from "lucide-react";
+import { CheckCircle2, Layers3, Vote, CalendarClock } from "lucide-react";
 import { voteService } from "../../services/vote.service";
 import { getApiErrorMessage } from "../../lib/utils";
+import "../../styles/voter.css";
 
 function formatDate(value) {
   if (!value) return "-";
 
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  try {
+    return new Intl.DateTimeFormat("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return "-";
+  }
 }
 
 export default function VoterMyVotesPage() {
   const [loading, setLoading] = useState(true);
   const [votes, setVotes] = useState([]);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     const loadVotes = async () => {
@@ -25,6 +31,7 @@ export default function VoterMyVotesPage() {
         setVotes(Array.isArray(data?.items) ? data.items : []);
       } catch (error) {
         toast.error(getApiErrorMessage(error));
+        setVotes([]);
       } finally {
         setLoading(false);
       }
@@ -33,25 +40,94 @@ export default function VoterMyVotesPage() {
     loadVotes();
   }, []);
 
+  const filteredVotes = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+
+    if (!keyword) return votes;
+
+    return votes.filter((vote) => {
+      return (
+        String(vote?.candidateId?.fullName || "")
+          .toLowerCase()
+          .includes(keyword) ||
+        String(vote?.postId?.title || "")
+          .toLowerCase()
+          .includes(keyword) ||
+        String(vote?.electionId?.title || "")
+          .toLowerCase()
+          .includes(keyword) ||
+        String(vote?.candidateId?.partyName || "")
+          .toLowerCase()
+          .includes(keyword)
+      );
+    });
+  }, [votes, search]);
+
+  const uniqueElectionCount = useMemo(() => {
+    return (
+      new Set(
+        filteredVotes.map((item) => item?.electionId?._id).filter(Boolean),
+      ).size || 0
+    );
+  }, [filteredVotes]);
+
   return (
     <section className="voter-page">
-      <div className="voter-section-heading">
-        <div>
-          <h2>My Votes</h2>
-          <p>
-            Ye page personal audit trail hai. Yahin se voter ko samajh aana
-            chahiye ki kis post me kis candidate ko vote diya tha.
-          </p>
+      <section className="voter-panel voter-panel--heroish">
+        <div className="voter-section-heading">
+          <div>
+            <h2>My Votes</h2>
+            <p>
+              Review the vote records associated with your account, including
+              the selected candidate, post, election, and submission time.
+            </p>
+          </div>
+
+          <div className="voter-search-wrap">
+            <input
+              type="text"
+              className="voter-search-input"
+              placeholder="Search by candidate, post, election, or party"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
         </div>
-      </div>
+
+        <div className="voter-summary-strip">
+          <div className="voter-summary-item">
+            <Layers3 size={18} />
+            <div>
+              <span>Total Vote Records</span>
+              <strong>{loading ? "..." : votes.length}</strong>
+            </div>
+          </div>
+
+          <div className="voter-summary-item">
+            <Vote size={18} />
+            <div>
+              <span>Filtered Results</span>
+              <strong>{loading ? "..." : filteredVotes.length}</strong>
+            </div>
+          </div>
+
+          <div className="voter-summary-item">
+            <CalendarClock size={18} />
+            <div>
+              <span>Unique Elections</span>
+              <strong>{loading ? "..." : uniqueElectionCount}</strong>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {loading ? (
         <div className="voter-empty-state voter-empty-state--lg">
           Loading your vote records...
         </div>
-      ) : votes.length ? (
+      ) : filteredVotes.length ? (
         <div className="voter-votes-list">
-          {votes.map((vote) => (
+          {filteredVotes.map((vote) => (
             <article key={vote._id} className="voter-vote-card">
               <div className="voter-vote-card__icon">
                 <CheckCircle2 size={18} />
@@ -60,7 +136,7 @@ export default function VoterMyVotesPage() {
               <div className="voter-vote-card__content">
                 <div className="voter-vote-card__top">
                   <h3>{vote?.candidateId?.fullName || "Candidate"}</h3>
-                  <span className="voter-tag">Recorded</span>
+                  <span className="voter-tag voter-tag--success">Recorded</span>
                 </div>
 
                 <div className="voter-vote-card__grid">
@@ -92,42 +168,8 @@ export default function VoterMyVotesPage() {
         </div>
       ) : (
         <div className="voter-empty-state voter-empty-state--lg">
-          <Vote size={18} />
-          No vote record found yet.
+          No vote records match your current search.
         </div>
-      )}
-
-      {!loading && votes.length > 0 && (
-        <section className="voter-panel">
-          <div className="voter-panel__header">
-            <div>
-              <h3>Quick Summary</h3>
-              <p>Simple count, no nonsense.</p>
-            </div>
-          </div>
-
-          <div className="voter-summary-strip">
-            <div className="voter-summary-item">
-              <Layers3 size={18} />
-              <div>
-                <span>Total Vote Records</span>
-                <strong>{votes.length}</strong>
-              </div>
-            </div>
-
-            <div className="voter-summary-item">
-              <Vote size={18} />
-              <div>
-                <span>Unique Elections</span>
-                <strong>
-                  {new Set(
-                    votes.map((item) => item?.electionId?._id).filter(Boolean),
-                  ).size || 0}
-                </strong>
-              </div>
-            </div>
-          </div>
-        </section>
       )}
     </section>
   );

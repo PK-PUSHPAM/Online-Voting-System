@@ -1,353 +1,592 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import {
-  Vote,
   ShieldCheck,
+  FileText,
+  Upload,
   CheckCircle2,
-  Clock3,
-  ArrowRight,
-  AlertTriangle,
-  BadgeCheck,
-  UserCircle2,
+  Info,
+  CalendarClock,
+  UserPlus,
+  Trash2,
 } from "lucide-react";
+import AuthLayout from "../../components/layout/AuthLayout";
+import InputField from "../../components/common/InputField";
+import Button from "../../components/common/Button";
+import { authService } from "../../services/auth.service";
+import { uploadService } from "../../services/upload.service";
 import { useAuth } from "../../hooks/useAuth";
-import { voterService } from "../../services/voter.service";
-import { voteService } from "../../services/vote.service";
 import { APP_ROUTES } from "../../lib/routes";
 import { getApiErrorMessage } from "../../lib/utils";
+import "../../styles/register-page.css";
+import "../../styles/auth-pages.css";
 
-function StatCard({ icon: Icon, label, value, helper }) {
-  return (
-    <article className="voter-stat-card">
-      <div className="voter-stat-card__icon">
-        <Icon size={18} />
-      </div>
+const initialForm = {
+  fullName: "",
+  email: "",
+  mobileNumber: "",
+  password: "",
+  otp: "",
+  dob: "",
+  identityType: "other",
+  identityLast4: "",
+  documentUrl: "",
+  documentPublicId: "",
+};
 
-      <div>
-        <p className="voter-stat-card__label">{label}</p>
-        <h3 className="voter-stat-card__value">{value}</h3>
-        <span className="voter-stat-card__helper">{helper}</span>
-      </div>
-    </article>
-  );
-}
+const identityTypeOptions = [
+  { value: "other", label: "Other" },
+  { value: "voterId", label: "Voter ID" },
+  { value: "collegeId", label: "College ID" },
+  { value: "aadhaarLast4", label: "Aadhaar Last 4" },
+];
 
-function getStatusTone(status) {
-  switch (String(status || "").toLowerCase()) {
-    case "approved":
-      return "success";
-    case "rejected":
-      return "danger";
-    default:
-      return "warning";
+const getAgeFromDob = (dob) => {
+  if (!dob) return null;
+
+  const birthDate = new Date(dob);
+
+  if (Number.isNaN(birthDate.getTime())) {
+    return null;
   }
-}
 
-export default function VoterDashboardPage() {
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [activeElectionsData, setActiveElectionsData] = useState({
-    count: 0,
-    elections: [],
-  });
-  const [myVotesData, setMyVotesData] = useState({
-    items: [],
-    pagination: null,
-  });
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
 
-  useEffect(() => {
-    const loadDashboard = async () => {
-      try {
-        setLoading(true);
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && today.getDate() < birthDate.getDate())
+  ) {
+    age -= 1;
+  }
 
-        const [electionsResponse, votesResponse] = await Promise.all([
-          voterService.getActiveElections(),
-          voteService.getMyVotes({ page: 1, limit: 5 }),
-        ]);
+  return age;
+};
 
-        setActiveElectionsData(electionsResponse);
-        setMyVotesData(votesResponse);
-      } catch (error) {
-        toast.error(getApiErrorMessage(error));
-      } finally {
-        setLoading(false);
-      }
+export default function RegisterPage() {
+  const { register, isAuthActionLoading } = useAuth();
+  const fileInputRef = useRef(null);
+
+  const [form, setForm] = useState(initialForm);
+  const [errors, setErrors] = useState({});
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [documentUploadLoading, setDocumentUploadLoading] = useState(false);
+  const [uploadedDocumentName, setUploadedDocumentName] = useState("");
+
+  const age = useMemo(() => getAgeFromDob(form.dob), [form.dob]);
+
+  const isIdentityLast4Required = useMemo(
+    () => form.identityType !== "other",
+    [form.identityType],
+  );
+
+  const ageEligibilityText = useMemo(() => {
+    if (!form.dob || age === null) {
+      return {
+        className: "register-age-status register-age-status--warn",
+        text: "Add date of birth to check age eligibility.",
+      };
+    }
+
+    if (age >= 18) {
+      return {
+        className: "register-age-status register-age-status--ok",
+        text: `Age eligibility check passed: ${age} years`,
+      };
+    }
+
+    return {
+      className: "register-age-status register-age-status--warn",
+      text: `Age eligibility check failed: ${age} years`,
     };
+  }, [age, form.dob]);
 
-    loadDashboard();
-  }, []);
+  const handleChange = (event) => {
+    const { name, value } = event.target;
 
-  const verificationStatus = String(user?.verificationStatus || "pending");
-  const verificationTone = getStatusTone(verificationStatus);
-  const totalVotesCast = Number(myVotesData?.pagination?.totalItems || 0);
-  const recentVotes = Array.isArray(myVotesData?.items)
-    ? myVotesData.items
-    : [];
-  const activeElections = Array.isArray(activeElectionsData?.elections)
-    ? activeElectionsData.elections
-    : [];
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
 
-  const readinessLabel = useMemo(() => {
-    if (!user?.mobileVerified) return "Mobile verification pending";
-    if (!user?.ageVerified) return "Age verification pending";
-    if (!user?.isEligibleToVote) return "Eligibility not cleared";
-    if (verificationStatus !== "approved") return "Admin approval pending";
+    setErrors((prev) => ({
+      ...prev,
+      [name]: "",
+    }));
+  };
 
-    return "Ready to vote";
-  }, [
-    user?.mobileVerified,
-    user?.ageVerified,
-    user?.isEligibleToVote,
-    verificationStatus,
-  ]);
+  const validate = () => {
+    const nextErrors = {};
+
+    if (form.fullName.trim().length < 3) {
+      nextErrors.fullName = "Full name must be at least 3 characters.";
+    }
+
+    if (!/\S+@\S+\.\S+/.test(form.email.trim())) {
+      nextErrors.email = "A valid email address is required.";
+    }
+
+    if (!/^[6-9]\d{9}$/.test(form.mobileNumber.trim())) {
+      nextErrors.mobileNumber = "Enter a valid 10-digit Indian mobile number.";
+    }
+
+    if (
+      !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_\-+={[}\]|\\:;"'<>,.?/~`]).{8,64}$/.test(
+        form.password,
+      )
+    ) {
+      nextErrors.password =
+        "Use at least 8 characters with uppercase, lowercase, number, and special character.";
+    }
+
+    if (!/^\d{4,6}$/.test(form.otp.trim())) {
+      nextErrors.otp = "OTP must contain 4 to 6 digits.";
+    }
+
+    if (!form.dob) {
+      nextErrors.dob = "Date of birth is required.";
+    }
+
+    if (age !== null && age < 18) {
+      nextErrors.dob = "You must be at least 18 years old to register.";
+    }
+
+    if (isIdentityLast4Required && !/^\d{4}$/.test(form.identityLast4.trim())) {
+      nextErrors.identityLast4 =
+        "Identity last 4 must contain exactly 4 digits.";
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleSendOtp = async () => {
+    const mobileNumber = form.mobileNumber.trim();
+    const email = form.email.trim();
+
+    const nextErrors = {};
+
+    if (!/^[6-9]\d{9}$/.test(mobileNumber)) {
+      nextErrors.mobileNumber = "Enter a valid mobile number first.";
+    }
+
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      nextErrors.email = "Enter a valid email address first.";
+    }
+
+    if (Object.keys(nextErrors).length) {
+      setErrors((prev) => ({ ...prev, ...nextErrors }));
+      return;
+    }
+
+    try {
+      setOtpLoading(true);
+
+      await authService.sendOtp({
+        mobileNumber,
+        purpose: "register",
+      });
+
+      setOtpSent(true);
+      toast.success("OTP sent successfully.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handlePickDocument = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleRemoveUploadedDocument = () => {
+    setForm((prev) => ({
+      ...prev,
+      documentUrl: "",
+      documentPublicId: "",
+    }));
+    setUploadedDocumentName("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDocumentChange = async (event) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    const allowedMimeTypes = [
+      "application/pdf",
+      "image/png",
+      "image/jpeg",
+      "image/jpg",
+      "image/webp",
+    ];
+
+    if (!allowedMimeTypes.includes(file.type)) {
+      toast.error("Only PDF, PNG, JPG, JPEG, and WEBP files are allowed.");
+      event.target.value = "";
+      return;
+    }
+
+    const maxSizeBytes = 5 * 1024 * 1024;
+
+    if (file.size > maxSizeBytes) {
+      toast.error("File size must be less than 5 MB.");
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      setDocumentUploadLoading(true);
+
+      const uploaded = await uploadService.uploadVoterDocument(
+        file,
+        form.documentPublicId,
+      );
+
+      setForm((prev) => ({
+        ...prev,
+        documentUrl: uploaded?.fileUrl || "",
+        documentPublicId: uploaded?.publicId || "",
+      }));
+
+      setUploadedDocumentName(file.name);
+      toast.success("Document uploaded successfully.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+      event.target.value = "";
+    } finally {
+      setDocumentUploadLoading(false);
+    }
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!validate()) {
+      return;
+    }
+
+    try {
+      const payload = {
+        fullName: form.fullName.trim(),
+        email: form.email.trim(),
+        mobileNumber: form.mobileNumber.trim(),
+        password: form.password,
+        otp: form.otp.trim(),
+        dob: form.dob,
+        identityType: form.identityType,
+        identityLast4:
+          form.identityType === "other" ? "" : form.identityLast4.trim(),
+        documentUrl: form.documentUrl,
+        documentPublicId: form.documentPublicId,
+      };
+
+      const data = await register(payload);
+
+      toast.success(
+        data?.isAdult
+          ? "Registration completed successfully. Please wait for admin verification."
+          : "Registration submitted, but age eligibility requirements were not met.",
+      );
+
+      setForm(initialForm);
+      setErrors({});
+      setOtpSent(false);
+      setUploadedDocumentName("");
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
+  };
 
   return (
-    <section className="voter-page">
-      <div className="voter-hero">
-        <div className="voter-hero__copy">
-          <span className="voter-hero__badge">
-            <ShieldCheck size={15} />
-            Your voting access at a glance
-          </span>
+    <AuthLayout
+      title="Create voter account"
+      subtitle="Register with verified personal details to request access to the voting platform."
+      badge="OTP Verified Registration"
+    >
+      <form onSubmit={handleSubmit} className="register-form">
+        <div className="register-meta-strip">
+          <div className="register-meta-pill">
+            <span>Verification</span>
+            <strong>Mobile OTP required</strong>
+          </div>
 
-          <h2>Vote only when your status is clean and the election is live.</h2>
+          <div className="register-meta-pill">
+            <span>Approval workflow</span>
+            <strong>Admin review after registration</strong>
+          </div>
 
-          <p>
-            Good voter UX should remove confusion. First check your status. Then
-            open only active elections. Then cast the vote carefully.
+          <div className="register-meta-pill">
+            <span>Document support</span>
+            <strong>Optional upload available</strong>
+          </div>
+        </div>
+
+        <section className="register-section">
+          <div className="register-section__header">
+            <div className="register-section__title-wrap">
+              <p className="register-section__eyebrow">Step 1</p>
+              <h3 className="register-section__title">Identity details</h3>
+              <p className="register-section__description">
+                Provide accurate personal information to avoid delays during
+                account verification.
+              </p>
+            </div>
+
+            <div className="register-section__icon">
+              <UserPlus size={18} />
+            </div>
+          </div>
+
+          <div className="register-grid">
+            <InputField
+              label="Full Name"
+              name="fullName"
+              placeholder="Enter full name"
+              value={form.fullName}
+              onChange={handleChange}
+              error={errors.fullName}
+            />
+
+            <InputField
+              label="Email"
+              name="email"
+              type="email"
+              placeholder="Enter email"
+              value={form.email}
+              onChange={handleChange}
+              error={errors.email}
+            />
+
+            <InputField
+              label="Mobile Number"
+              name="mobileNumber"
+              placeholder="10-digit mobile number"
+              value={form.mobileNumber}
+              onChange={handleChange}
+              error={errors.mobileNumber}
+            />
+
+            <InputField
+              label="Password"
+              name="password"
+              type="password"
+              placeholder="Create a strong password"
+              value={form.password}
+              onChange={handleChange}
+              error={errors.password}
+              hint="Use uppercase, lowercase, number, and special character."
+            />
+
+            <InputField
+              label="Date of Birth"
+              name="dob"
+              type="date"
+              value={form.dob}
+              onChange={handleChange}
+              error={errors.dob}
+            />
+
+            <div className="form-field">
+              <label className="form-label">Identity Type</label>
+              <select
+                className="register-select"
+                name="identityType"
+                value={form.identityType}
+                onChange={handleChange}
+              >
+                {identityTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <InputField
+              className="register-grid__full"
+              label="Identity Last 4"
+              name="identityLast4"
+              placeholder="Enter last 4 digits"
+              value={form.identityLast4}
+              onChange={handleChange}
+              error={errors.identityLast4}
+              hint={
+                isIdentityLast4Required
+                  ? "Required for the selected identity type."
+                  : "Optional when identity type is set to Other."
+              }
+            />
+          </div>
+
+          <div className={ageEligibilityText.className}>
+            <CalendarClock size={16} />
+            <span>{ageEligibilityText.text}</span>
+          </div>
+        </section>
+
+        <section className="register-section">
+          <div className="register-section__header">
+            <div className="register-section__title-wrap">
+              <p className="register-section__eyebrow">Step 2</p>
+              <h3 className="register-section__title">Supporting document</h3>
+              <p className="register-section__description">
+                You may upload a document to support your verification request
+                and reduce manual follow-up.
+              </p>
+            </div>
+
+            <div className="register-section__icon">
+              <FileText size={18} />
+            </div>
+          </div>
+
+          <div className="register-upload">
+            <div className="register-upload__box">
+              <div className="register-upload__content">
+                <div className="register-upload__icon">
+                  <Upload size={18} />
+                </div>
+
+                <div>
+                  <h4>Upload identity or supporting document</h4>
+                  <p>
+                    Accepted formats: PDF, PNG, JPG, JPEG, WEBP. Maximum size: 5
+                    MB.
+                  </p>
+                </div>
+              </div>
+
+              <div className="register-upload__actions">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="register-upload__hidden-input"
+                  accept=".pdf,.png,.jpg,.jpeg,.webp"
+                  onChange={handleDocumentChange}
+                />
+
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={documentUploadLoading}
+                  onClick={handlePickDocument}
+                >
+                  {form.documentUrl ? "Replace file" : "Choose file"}
+                </Button>
+              </div>
+            </div>
+
+            {form.documentUrl ? (
+              <div className="register-upload__summary">
+                <div className="register-upload__summary-left">
+                  <div className="register-upload__summary-icon">
+                    <CheckCircle2 size={18} />
+                  </div>
+
+                  <div>
+                    <h5>Document uploaded</h5>
+                    <p>{uploadedDocumentName || "Uploaded file attached"}</p>
+                  </div>
+                </div>
+
+                <div className="register-upload__actions">
+                  <a
+                    href={form.documentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="register-upload__summary-link"
+                  >
+                    Open file
+                  </a>
+
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleRemoveUploadedDocument}
+                  >
+                    <Trash2 size={16} />
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="register-helper">
+            <Info size={16} />
+            <p>
+              Document upload is optional, but it can help accelerate the manual
+              verification process.
+            </p>
+          </div>
+        </section>
+
+        <section className="register-section">
+          <div className="register-section__header">
+            <div className="register-section__title-wrap">
+              <p className="register-section__eyebrow">Step 3</p>
+              <h3 className="register-section__title">OTP verification</h3>
+              <p className="register-section__description">
+                Request the OTP first, then enter the code exactly as received
+                to complete registration.
+              </p>
+            </div>
+
+            <div className="register-section__icon">
+              <ShieldCheck size={18} />
+            </div>
+          </div>
+
+          <div className="register-otp-row">
+            <InputField
+              label="OTP"
+              name="otp"
+              placeholder="Enter OTP"
+              value={form.otp}
+              onChange={handleChange}
+              error={errors.otp}
+            />
+
+            <Button
+              type="button"
+              variant="secondary"
+              loading={otpLoading}
+              onClick={handleSendOtp}
+            >
+              {otpSent ? "Resend OTP" : "Send OTP"}
+            </Button>
+          </div>
+        </section>
+
+        <div className="register-submit-wrap">
+          <Button type="submit" loading={isAuthActionLoading}>
+            Complete Registration
+          </Button>
+
+          <p className="register-footer-note">
+            After registration, your account may remain restricted until the
+            admin verification process is completed.
           </p>
 
-          <div className="voter-hero__actions">
-            <Link className="voter-primary-btn" to={APP_ROUTES.VOTER_ELECTIONS}>
-              Open Active Elections
-              <ArrowRight size={16} />
-            </Link>
-
-            <Link className="voter-secondary-btn" to={APP_ROUTES.VOTER_PROFILE}>
-              Check Profile Status
-            </Link>
-          </div>
+          <p className="auth-footer-text">
+            Already have an account? <Link to={APP_ROUTES.LOGIN}>Sign in</Link>
+          </p>
         </div>
-
-        <div className="voter-hero__panel">
-          <div
-            className={`voter-status-card voter-status-card--${verificationTone}`}
-          >
-            <div className="voter-status-card__header">
-              <strong>Verification Status</strong>
-              <span>{verificationStatus}</span>
-            </div>
-
-            <p>{readinessLabel}</p>
-          </div>
-
-          <div className="voter-hero__mini-grid">
-            <div className="voter-mini-card">
-              <span>Eligible to vote</span>
-              <strong>{user?.isEligibleToVote ? "Yes" : "No"}</strong>
-            </div>
-
-            <div className="voter-mini-card">
-              <span>Mobile verified</span>
-              <strong>{user?.mobileVerified ? "Yes" : "No"}</strong>
-            </div>
-
-            <div className="voter-mini-card">
-              <span>Age verified</span>
-              <strong>{user?.ageVerified ? "Yes" : "No"}</strong>
-            </div>
-
-            <div className="voter-mini-card">
-              <span>Approval state</span>
-              <strong>{verificationStatus}</strong>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="voter-stats-grid">
-        <StatCard
-          icon={Vote}
-          label="Active Elections"
-          value={loading ? "..." : activeElectionsData?.count || 0}
-          helper="Currently available to open"
-        />
-
-        <StatCard
-          icon={CheckCircle2}
-          label="Votes Cast"
-          value={loading ? "..." : totalVotesCast}
-          helper="Recorded in your account"
-        />
-
-        <StatCard
-          icon={BadgeCheck}
-          label="Eligibility"
-          value={user?.isEligibleToVote ? "Cleared" : "Blocked"}
-          helper="Backend decides the final permission"
-        />
-
-        <StatCard
-          icon={Clock3}
-          label="Account Readiness"
-          value={readinessLabel}
-          helper="This decides whether voting will work"
-        />
-      </div>
-
-      <div className="voter-grid">
-        <section className="voter-panel">
-          <div className="voter-panel__header">
-            <div>
-              <h3>Available Elections</h3>
-              <p>Only active and allowed elections should appear here.</p>
-            </div>
-
-            <Link to={APP_ROUTES.VOTER_ELECTIONS}>View all</Link>
-          </div>
-
-          <div className="voter-panel__body">
-            {loading ? (
-              <div className="voter-empty-state">Loading elections...</div>
-            ) : activeElections.length ? (
-              <div className="voter-list">
-                {activeElections.slice(0, 4).map((election) => (
-                  <article key={election._id} className="voter-list-card">
-                    <div>
-                      <h4>{election.title}</h4>
-                      <p>
-                        {election.description ||
-                          "No election description added yet."}
-                      </p>
-                    </div>
-
-                    <Link
-                      className="voter-inline-link"
-                      to={`/voter/elections/${election._id}`}
-                    >
-                      Open ballot
-                      <ArrowRight size={15} />
-                    </Link>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="voter-empty-state">
-                No active election is available for you right now.
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className="voter-panel">
-          <div className="voter-panel__header">
-            <div>
-              <h3>Recent Vote Activity</h3>
-              <p>Quick review of your latest recorded vote entries.</p>
-            </div>
-
-            <Link to={APP_ROUTES.VOTER_MY_VOTES}>View all</Link>
-          </div>
-
-          <div className="voter-panel__body">
-            {loading ? (
-              <div className="voter-empty-state">Loading recent votes...</div>
-            ) : recentVotes.length ? (
-              <div className="voter-list">
-                {recentVotes.map((vote) => (
-                  <article key={vote._id} className="voter-list-card">
-                    <div>
-                      <h4>{vote?.candidateId?.fullName || "Candidate"}</h4>
-                      <p>
-                        {vote?.electionId?.title || "Election"} •{" "}
-                        {vote?.postId?.title || "Post"}
-                      </p>
-                    </div>
-
-                    <span className="voter-tag">Recorded</span>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="voter-empty-state">
-                You have not cast any vote yet.
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
-
-      {verificationStatus === "rejected" && (
-        <section className="voter-alert voter-alert--danger">
-          <AlertTriangle size={18} />
-          <div>
-            <strong>Verification rejected</strong>
-            <p>
-              {user?.verificationRejectionReason ||
-                "Your verification was rejected. Fix the issue before expecting the voting flow to work."}
-            </p>
-          </div>
-        </section>
-      )}
-
-      {verificationStatus === "pending" && (
-        <section className="voter-alert voter-alert--warning">
-          <AlertTriangle size={18} />
-          <div>
-            <strong>Approval still pending</strong>
-            <p>
-              Your account may be blocked from voting until admin approval is
-              completed.
-            </p>
-          </div>
-        </section>
-      )}
-
-      <section className="voter-panel">
-        <div className="voter-panel__header">
-          <div>
-            <h3>Profile Snapshot</h3>
-            <p>
-              Core identity and voting-related status pulled from your account.
-            </p>
-          </div>
-        </div>
-
-        <div className="voter-profile-grid">
-          <div className="voter-profile-item">
-            <UserCircle2 size={18} />
-            <div>
-              <span>Full Name</span>
-              <strong>{user?.fullName || "-"}</strong>
-            </div>
-          </div>
-
-          <div className="voter-profile-item">
-            <ShieldCheck size={18} />
-            <div>
-              <span>Email</span>
-              <strong>{user?.email || "-"}</strong>
-            </div>
-          </div>
-
-          <div className="voter-profile-item">
-            <Vote size={18} />
-            <div>
-              <span>Mobile Number</span>
-              <strong>{user?.mobileNumber || "-"}</strong>
-            </div>
-          </div>
-
-          <div className="voter-profile-item">
-            <CheckCircle2 size={18} />
-            <div>
-              <span>Internal Voter ID</span>
-              <strong>{user?.internalVoterId || "Not assigned yet"}</strong>
-            </div>
-          </div>
-        </div>
-      </section>
-    </section>
+      </form>
+    </AuthLayout>
   );
 }

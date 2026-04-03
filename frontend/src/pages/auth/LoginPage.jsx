@@ -1,78 +1,64 @@
-import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
+import { useState } from "react";
+import { LockKeyhole, ShieldCheck, UserCircle2, Info } from "lucide-react";
 import AuthLayout from "../../components/layout/AuthLayout";
 import InputField from "../../components/common/InputField";
 import Button from "../../components/common/Button";
 import { useAuth } from "../../hooks/useAuth";
 import { APP_ROUTES } from "../../lib/routes";
 import { getApiErrorMessage } from "../../lib/utils";
+import "../../styles/auth-pages.css";
 
-const getRedirectPathByRole = (role) => {
-  if (!role) return APP_ROUTES.VOTER_DASHBOARD;
-
-  const normalizedRole = String(role).toLowerCase();
-
-  if (
-    normalizedRole === "admin" ||
-    normalizedRole === "super_admin" ||
-    normalizedRole === "superadmin"
-  ) {
-    return APP_ROUTES.ADMIN_DASHBOARD;
-  }
-
-  return APP_ROUTES.VOTER_DASHBOARD;
+const initialForm = {
+  emailOrMobile: "",
+  password: "",
 };
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { login, isAuthActionLoading } = useAuth();
 
-  const [form, setForm] = useState({
-    emailOrMobile: "",
-    password: "",
-  });
-
-  const [errors, setErrors] = useState({});
+  const [form, setForm] = useState(initialForm);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-    setErrors((prev) => ({ ...prev, [name]: "" }));
-  };
 
-  const validate = () => {
-    const nextErrors = {};
-
-    if (!form.emailOrMobile.trim()) {
-      nextErrors.emailOrMobile = "Email or mobile is required";
-    }
-
-    if (!form.password.trim()) {
-      nextErrors.password = "Password is required";
-    }
-
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!validate()) return;
+    if (!form.emailOrMobile.trim()) {
+      toast.error("Please enter your email address or mobile number.");
+      return;
+    }
+
+    if (!form.password) {
+      toast.error("Please enter your password.");
+      return;
+    }
 
     try {
-      const data = await login(form);
+      const data = await login({
+        emailOrMobile: form.emailOrMobile.trim(),
+        password: form.password,
+      });
 
-      console.log("LOGIN USER:", data?.user);
+      toast.success("Signed in successfully.");
 
-      toast.success("Login successful");
+      const role = String(data?.user?.role || "").toLowerCase();
 
-      const fallbackPath = getRedirectPathByRole(data?.user?.role);
-      const redirectTo = location.state?.from || fallbackPath;
+      if (role === "admin" || role === "super_admin" || role === "superadmin") {
+        navigate(APP_ROUTES.ADMIN_DASHBOARD);
+        return;
+      }
 
-      navigate(redirectTo, { replace: true });
+      navigate(APP_ROUTES.VOTER_DASHBOARD);
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     }
@@ -80,41 +66,116 @@ export default function LoginPage() {
 
   return (
     <AuthLayout
-      title="Welcome back"
-      subtitle="Login with your password to continue into the voting platform."
+      title="Sign in to your account"
+      subtitle="Access the voting platform securely using your registered credentials."
+      badge="Secure Account Access"
     >
-      <form onSubmit={handleSubmit} className="auth-form">
-        <InputField
-          label="Email or Mobile Number"
-          name="emailOrMobile"
-          placeholder="Enter email or 10-digit mobile number"
-          value={form.emailOrMobile}
-          onChange={handleChange}
-          error={errors.emailOrMobile}
-        />
+      <form className="auth-form" onSubmit={handleSubmit}>
+        <div className="auth-form__meta-strip">
+          <div className="auth-form__meta-card">
+            <span>Login method</span>
+            <strong>Email or mobile with password</strong>
+          </div>
 
-        <InputField
-          label="Password"
-          name="password"
-          type="password"
-          placeholder="Enter your password"
-          value={form.password}
-          onChange={handleChange}
-          error={errors.password}
-        />
+          <div className="auth-form__meta-card">
+            <span>Access type</span>
+            <strong>Voter, Admin, and Super Admin accounts</strong>
+          </div>
 
-        <Button type="submit" loading={isAuthActionLoading}>
-          Login
-        </Button>
-
-        <div className="auth-links">
-          <Link to={APP_ROUTES.FORGOT_PASSWORD}>Forgot password?</Link>
-          <Link to={APP_ROUTES.OTP_LOGIN}>Login with OTP</Link>
+          <div className="auth-form__meta-card">
+            <span>Security</span>
+            <strong>Session-based protected access</strong>
+          </div>
         </div>
 
-        <p className="auth-footer-text">
-          New here? <Link to={APP_ROUTES.REGISTER}>Create voter account</Link>
-        </p>
+        <section className="auth-form__section">
+          <div className="auth-form__section-header">
+            <div className="auth-form__section-copy">
+              <p className="auth-form__eyebrow">Step 1</p>
+              <h3 className="auth-form__title">Account credentials</h3>
+              <p className="auth-form__description">
+                Enter the same email address or mobile number used during
+                registration, along with your password.
+              </p>
+            </div>
+
+            <div className="auth-form__icon">
+              <UserCircle2 size={18} />
+            </div>
+          </div>
+
+          <div className="auth-form__grid">
+            <InputField
+              className="auth-form__full"
+              label="Email or Mobile Number"
+              name="emailOrMobile"
+              placeholder="Enter email or mobile number"
+              value={form.emailOrMobile}
+              onChange={handleChange}
+            />
+
+            <InputField
+              className="auth-form__full"
+              label="Password"
+              name="password"
+              type="password"
+              placeholder="Enter password"
+              value={form.password}
+              onChange={handleChange}
+            />
+          </div>
+        </section>
+
+        <section className="auth-form__section">
+          <div className="auth-form__section-header">
+            <div className="auth-form__section-copy">
+              <p className="auth-form__eyebrow">Step 2</p>
+              <h3 className="auth-form__title">Session access</h3>
+              <p className="auth-form__description">
+                After successful sign-in, you will be redirected according to
+                your role and account permissions.
+              </p>
+            </div>
+
+            <div className="auth-form__icon">
+              <LockKeyhole size={18} />
+            </div>
+          </div>
+
+          <div className="auth-form__helper">
+            <Info size={16} />
+            <p>
+              If your voter account has not been approved yet, you may still
+              sign in, but voting-related actions can remain restricted until
+              verification is complete.
+            </p>
+          </div>
+        </section>
+
+        <div className="auth-form__actions">
+          <Button type="submit" loading={isAuthActionLoading}>
+            Sign In
+          </Button>
+
+          <p className="auth-form__footer-note">
+            For passwordless access, you can use the OTP sign-in option if it is
+            enabled for your account.
+          </p>
+
+          <p className="auth-footer-text">
+            Need another option?{" "}
+            <Link to={APP_ROUTES.OTP_LOGIN}>Login with OTP</Link>
+          </p>
+
+          <p className="auth-footer-text">
+            Forgot your password?{" "}
+            <Link to={APP_ROUTES.FORGOT_PASSWORD}>Reset password</Link>
+          </p>
+
+          <p className="auth-footer-text">
+            New here? <Link to={APP_ROUTES.REGISTER}>Create an account</Link>
+          </p>
+        </div>
       </form>
     </AuthLayout>
   );

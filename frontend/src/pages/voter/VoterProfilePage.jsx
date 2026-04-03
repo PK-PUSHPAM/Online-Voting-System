@@ -12,6 +12,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
+import "../../styles/voter.css";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -61,15 +62,23 @@ export default function VoterProfilePage() {
     verificationStatus.charAt(0).toUpperCase() + verificationStatus.slice(1);
 
   const readinessText = useMemo(() => {
-    if (!user?.mobileVerified) return "Mobile verification is still pending.";
-    if (!user?.ageVerified) return "Age verification is not completed yet.";
-    if (!user?.isEligibleToVote)
-      return "Eligibility check failed or not cleared.";
-    if (verificationStatus !== "approved") {
-      return "Admin approval is still required before you can vote.";
+    if (!user?.mobileVerified) {
+      return "Your mobile number is not yet verified.";
     }
 
-    return "Your account is in a clean state for voting.";
+    if (!user?.ageVerified) {
+      return "Your age verification is still pending.";
+    }
+
+    if (!user?.isEligibleToVote) {
+      return "Your account has not yet cleared eligibility validation.";
+    }
+
+    if (verificationStatus !== "approved") {
+      return "Administrative approval is still required before voting can begin.";
+    }
+
+    return "Your account is verified and ready for voting.";
   }, [
     user?.mobileVerified,
     user?.ageVerified,
@@ -77,14 +86,16 @@ export default function VoterProfilePage() {
     verificationStatus,
   ]);
 
+  const roleLabel = String(user?.role || "voter").replaceAll("_", " ");
+
   return (
     <section className="voter-page">
       <div className="voter-section-heading">
         <div>
           <h2>Profile & Voting Status</h2>
           <p>
-            Is page ka kaam sirf dikhawa nahi hai. Yahin se voter ko clear
-            dikhna chahiye ki vote kar sakta hai ya nahi.
+            Review your account details, verification checks, and readiness for
+            participating in elections.
           </p>
         </div>
       </div>
@@ -98,9 +109,7 @@ export default function VoterProfilePage() {
           <div>
             <h3>{user?.fullName || "Voter"}</h3>
             <p>{user?.email || "-"}</p>
-            <span className="voter-tag voter-tag--soft">
-              Role: {String(user?.role || "voter").replace("_", " ")}
-            </span>
+            <span className="voter-tag voter-tag--soft">Role: {roleLabel}</span>
           </div>
         </div>
 
@@ -143,7 +152,9 @@ export default function VoterProfilePage() {
             <ShieldCheck size={18} />
             <div>
               <span>Eligibility</span>
-              <strong>{user?.isEligibleToVote ? "Cleared" : "Blocked"}</strong>
+              <strong>
+                {user?.isEligibleToVote ? "Cleared" : "Restricted"}
+              </strong>
             </div>
           </div>
 
@@ -182,10 +193,10 @@ export default function VoterProfilePage() {
         <section className="voter-alert voter-alert--danger">
           <ShieldAlert size={18} />
           <div>
-            <strong>Why your profile is blocked</strong>
+            <strong>Verification rejected</strong>
             <p>
               {user?.verificationRejectionReason ||
-                "Rejection reason was not provided by the admin."}
+                "No rejection reason has been provided by the administrator."}
             </p>
           </div>
         </section>
@@ -196,7 +207,9 @@ export default function VoterProfilePage() {
           <div className="voter-panel__header">
             <div>
               <h3>Identity Details</h3>
-              <p>Core personal and voter-linked fields from your account.</p>
+              <p>
+                Core account details currently stored for your voter profile.
+              </p>
             </div>
           </div>
 
@@ -244,7 +257,10 @@ export default function VoterProfilePage() {
           <div className="voter-panel__header">
             <div>
               <h3>Verification Summary</h3>
-              <p>These flags directly affect whether vote casting will work.</p>
+              <p>
+                These checks directly affect whether voting is enabled for your
+                account.
+              </p>
             </div>
           </div>
 
@@ -270,22 +286,19 @@ export default function VoterProfilePage() {
             </div>
 
             <div className="voter-check-row">
-              <span>Verified At</span>
-              <strong>{formatDate(user?.verifiedAt)}</strong>
-            </div>
-
-            <div className="voter-check-row">
-              <span>Document Uploaded</span>
-              <strong>{user?.documentUrl ? "Yes" : "No"}</strong>
+              <span>Rejection Reason</span>
+              <strong>{user?.verificationRejectionReason || "-"}</strong>
             </div>
           </div>
 
-          {user?.verificationNotes ? (
-            <div className="voter-note-card">
-              <strong>Admin / verification notes</strong>
-              <p>{user.verificationNotes}</p>
-            </div>
-          ) : null}
+          <div className="voter-note-card">
+            <strong>Important note</strong>
+            <p>
+              Final voting access is determined by backend verification and
+              approval logic. Profile visibility alone does not grant voting
+              permission.
+            </p>
+          </div>
         </section>
       </div>
     </section>

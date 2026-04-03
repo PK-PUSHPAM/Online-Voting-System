@@ -1,665 +1,719 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { toast } from "react-hot-toast";
+import {
+  Activity,
+  ArrowRight,
+  BadgeCheck,
+  BarChart3,
+  Clock3,
+  Shield,
+  Users,
+  Vote,
+  UserCheck,
+  AlertTriangle,
+} from "lucide-react";
 import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  CartesianGrid,
-  Tooltip,
   XAxis,
   YAxis,
+  CartesianGrid,
+  Tooltip,
   PieChart,
   Pie,
   Cell,
   AreaChart,
   Area,
+  LineChart,
+  Line,
+  Legend,
 } from "recharts";
-import {
-  Users,
-  Vote,
-  UserCheck,
-  Clock3,
-  Shield,
-  Activity,
-  RefreshCw,
-  TrendingUp,
-  CheckCircle2,
-  AlertTriangle,
-  UserSquare2,
-  Briefcase,
-} from "lucide-react";
 import { adminService } from "../../services/admin.service";
+import { APP_ROUTES } from "../../lib/routes";
 import { getApiErrorMessage } from "../../lib/utils";
+import "../../styles/dashboard.css";
 
-const PIE_COLORS = ["#6d72ff", "#15c7e5", "#22c55e"];
-const ELECTION_BAR_COLORS = ["#f59e0b", "#22c55e", "#ef4444"];
+const CHART_COLORS = [
+  "#6d72ff",
+  "#13c8e6",
+  "#22c55e",
+  "#f59e0b",
+  "#ef4444",
+  "#a855f7",
+];
 
-function formatNumber(value) {
-  const numericValue = Number(value || 0);
-  return new Intl.NumberFormat("en-IN").format(numericValue);
-}
+const safeNumber = (value) => Number(value || 0);
 
-function StatCard({ title, value, subtitle, icon: Icon, tone = "primary" }) {
+const getStatusToneClass = (status) => {
+  const value = String(status || "").toLowerCase();
+
+  if (value === "active") return "admin-status-pill admin-status-pill--active";
+  if (value === "ended") return "admin-status-pill admin-status-pill--ended";
+  return "admin-status-pill admin-status-pill--upcoming";
+};
+
+const formatVerificationLabel = (status) => {
+  const value = String(status || "unknown").replaceAll("_", " ");
+  return value.charAt(0).toUpperCase() + value.slice(1);
+};
+
+function StatCard({ label, value, meta, icon: Icon, tone }) {
   return (
     <article className={`admin-stat-card admin-stat-card--${tone}`}>
       <div className="admin-stat-card__top">
         <div>
-          <p className="admin-stat-card__label">{title}</p>
-          <h3 className="admin-stat-card__value">{formatNumber(value)}</h3>
+          <p className="admin-stat-card__label">{label}</p>
+          <h3 className="admin-stat-card__value">{value}</h3>
         </div>
 
         <div className="admin-stat-card__icon">
-          <Icon size={18} />
+          <Icon size={20} />
         </div>
       </div>
 
-      <p className="admin-stat-card__meta">{subtitle}</p>
+      <p className="admin-stat-card__meta">{meta}</p>
     </article>
   );
 }
 
-function Panel({ title, description, action, children, tall = false }) {
-  return (
-    <section className={`admin-panel ${tall ? "admin-panel--tall" : ""}`}>
-      <div className="admin-panel__header">
-        <div>
-          <h3>{title}</h3>
-          {description ? <p>{description}</p> : null}
-        </div>
-
-        {action ? <div className="admin-panel__action">{action}</div> : null}
-      </div>
-
-      <div className="admin-panel__body">{children}</div>
-    </section>
-  );
-}
-
-function EmptyPanelState({ label }) {
-  return (
-    <div className="admin-empty-state">
-      <p>{label}</p>
-    </div>
-  );
-}
-
-function DashboardSkeleton() {
-  return (
-    <section className="admin-dashboard">
-      <div className="admin-dashboard__hero admin-skeleton admin-skeleton--hero" />
-
-      <div className="admin-dashboard__stats">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="admin-skeleton admin-skeleton--card" />
-        ))}
-      </div>
-
-      <div className="admin-dashboard__grid">
-        <div className="admin-skeleton admin-skeleton--panel" />
-        <div className="admin-skeleton admin-skeleton--panel" />
-        <div className="admin-skeleton admin-skeleton--panel-wide" />
-      </div>
-    </section>
-  );
-}
-
 export default function AdminDashboardPage() {
-  const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const loadDashboard = async ({ silent = false } = {}) => {
-    try {
-      if (silent) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      const data = await adminService.getDashboardSummary();
-      setDashboardData(data);
-    } catch (error) {
-      toast.error(getApiErrorMessage(error));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const [summary, setSummary] = useState(null);
 
   useEffect(() => {
+    const loadDashboard = async () => {
+      try {
+        setLoading(true);
+        const data = await adminService.getDashboardSummary();
+        setSummary(data || null);
+      } catch (error) {
+        toast.error(getApiErrorMessage(error));
+        setSummary(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadDashboard();
   }, []);
 
-  const counters = dashboardData?.counters || {};
-  const recentAuditLogs = Array.isArray(dashboardData?.recentAuditLogs)
-    ? dashboardData.recentAuditLogs
+  const stats = summary?.stats || {};
+  const elections = Array.isArray(summary?.elections) ? summary.elections : [];
+  const auditLogs = Array.isArray(summary?.auditLogs) ? summary.auditLogs : [];
+  const voteTrends = Array.isArray(summary?.voteTrends)
+    ? summary.voteTrends
     : [];
-  const topActiveElectionsByVotes = Array.isArray(
-    dashboardData?.topActiveElectionsByVotes,
-  )
-    ? dashboardData.topActiveElectionsByVotes
+  const verificationBreakdown = Array.isArray(summary?.verificationBreakdown)
+    ? summary.verificationBreakdown
     : [];
 
-  const voterApprovalData = useMemo(
-    () => [
-      {
-        name: "Pending",
-        value: Number(counters?.pendingVoters || 0),
-      },
-      {
-        name: "Approved",
-        value: Number(counters?.approvedVoters || 0),
-      },
-      {
-        name: "Rejected",
-        value: Number(counters?.rejectedVoters || 0),
-      },
-    ],
-    [
-      counters?.pendingVoters,
-      counters?.approvedVoters,
-      counters?.rejectedVoters,
-    ],
-  );
+  const voteTrendChartData = useMemo(() => {
+    return voteTrends.map((item, index) => ({
+      label: item?.date || `Point ${index + 1}`,
+      votes: safeNumber(item?.votes),
+    }));
+  }, [voteTrends]);
 
-  const electionStatusData = useMemo(
-    () => [
-      {
-        name: "Upcoming",
-        value: Number(counters?.upcomingElections || 0),
-      },
-      {
-        name: "Active",
-        value: Number(counters?.activeElections || 0),
-      },
-      {
-        name: "Ended",
-        value: Number(counters?.endedElections || 0),
-      },
-    ],
-    [
-      counters?.upcomingElections,
-      counters?.activeElections,
-      counters?.endedElections,
-    ],
-  );
+  const verificationChartData = useMemo(() => {
+    return verificationBreakdown.map((item) => ({
+      label: formatVerificationLabel(item?.status),
+      value: safeNumber(item?.count),
+    }));
+  }, [verificationBreakdown]);
 
-  const systemOverviewData = useMemo(
-    () => [
-      {
-        name: "Users",
-        value: Number(counters?.totalUsers || 0),
-      },
-      {
-        name: "Voters",
-        value: Number(counters?.totalVoters || 0),
-      },
-      {
-        name: "Posts",
-        value: Number(counters?.totalPosts || 0),
-      },
-      {
-        name: "Candidates",
-        value: Number(counters?.totalCandidates || 0),
-      },
-      {
-        name: "Votes",
-        value: Number(counters?.totalVotes || 0),
-      },
-    ],
-    [
-      counters?.totalUsers,
-      counters?.totalVoters,
-      counters?.totalPosts,
-      counters?.totalCandidates,
-      counters?.totalVotes,
-    ],
-  );
+  const electionChartData = useMemo(() => {
+    return elections.map((item, index) => ({
+      shortTitle:
+        String(item?.title || `Election ${index + 1}`).length > 16
+          ? `${String(item?.title).slice(0, 16)}...`
+          : String(item?.title || `Election ${index + 1}`),
+      totalVotes: safeNumber(item?.totalVotes),
+    }));
+  }, [elections]);
 
-  const approvalRate = useMemo(() => {
-    const totalVoters = Number(counters?.totalVoters || 0);
-    const approvedVoters = Number(counters?.approvedVoters || 0);
+  const operationalTrendData = useMemo(() => {
+    const maxLength = Math.max(
+      voteTrendChartData.length,
+      verificationChartData.length,
+      0,
+    );
 
-    if (!totalVoters) return 0;
+    return Array.from({ length: maxLength }, (_, index) => ({
+      label:
+        voteTrendChartData[index]?.label ||
+        verificationChartData[index]?.label ||
+        `Point ${index + 1}`,
+      votes: safeNumber(voteTrendChartData[index]?.votes),
+      approvals: safeNumber(verificationChartData[index]?.value),
+    }));
+  }, [voteTrendChartData, verificationChartData]);
 
-    return Math.round((approvedVoters / totalVoters) * 100);
-  }, [counters?.totalVoters, counters?.approvedVoters]);
+  const latestAuditLogs = useMemo(() => auditLogs.slice(0, 5), [auditLogs]);
+  const topElections = useMemo(() => elections.slice(0, 5), [elections]);
 
-  const electionParticipationSummary = useMemo(() => {
-    const totalElections = Number(counters?.totalElections || 0);
-    const activeElections = Number(counters?.activeElections || 0);
-
-    if (!totalElections) return 0;
-
-    return Math.round((activeElections / totalElections) * 100);
-  }, [counters?.totalElections, counters?.activeElections]);
-
-  if (loading) {
-    return <DashboardSkeleton />;
-  }
+  const maxElectionVotes = useMemo(() => {
+    return Math.max(
+      ...topElections.map((item) => safeNumber(item?.totalVotes)),
+      1,
+    );
+  }, [topElections]);
 
   return (
     <section className="admin-dashboard">
-      <div className="admin-dashboard__hero">
-        <div className="admin-dashboard__hero-copy">
-          <span className="admin-dashboard__hero-badge">
-            <TrendingUp size={15} />
-            Live operational overview
-          </span>
-
-          <h2>Run the whole voting platform from one clear dashboard.</h2>
-
-          <p>
-            This screen is where admin UX should feel serious, not amateur.
-            Numbers first. Clarity first. Control first.
-          </p>
-
-          <div className="admin-dashboard__hero-actions">
-            <button
-              type="button"
-              className="admin-cta-btn admin-cta-btn--primary"
-              onClick={() => loadDashboard({ silent: true })}
-              disabled={refreshing}
-            >
-              <RefreshCw
-                size={16}
-                className={refreshing ? "spin-animation" : ""}
-              />
-              {refreshing ? "Refreshing..." : "Refresh dashboard"}
-            </button>
-
-            <div className="admin-hero-inline-stats">
-              <span>
-                <CheckCircle2 size={14} />
-                Approval rate: {approvalRate}%
+      {loading ? (
+        <>
+          <div className="admin-skeleton admin-skeleton--hero" />
+          <div className="admin-dashboard__stats">
+            <div className="admin-skeleton admin-skeleton--card" />
+            <div className="admin-skeleton admin-skeleton--card" />
+            <div className="admin-skeleton admin-skeleton--card" />
+            <div className="admin-skeleton admin-skeleton--card" />
+          </div>
+          <div className="admin-dashboard__grid">
+            <div className="admin-skeleton admin-skeleton--panel" />
+            <div className="admin-skeleton admin-skeleton--panel" />
+            <div className="admin-skeleton admin-skeleton--panel-wide" />
+          </div>
+        </>
+      ) : (
+        <>
+          <section className="admin-dashboard__hero">
+            <div className="admin-dashboard__hero-copy">
+              <span className="admin-dashboard__hero-badge">
+                <Shield size={15} />
+                Administrative overview
               </span>
-              <span>
-                <Activity size={14} />
-                Active election ratio: {electionParticipationSummary}%
-              </span>
-            </div>
-          </div>
-        </div>
 
-        <div className="admin-dashboard__hero-grid">
-          <div className="admin-hero-mini-card">
-            <span>Active admins</span>
-            <strong>{formatNumber(counters?.activeAdmins || 0)}</strong>
-          </div>
+              <h2>
+                Monitor election performance, voter verification, and
+                administrative activity from one dashboard.
+              </h2>
 
-          <div className="admin-hero-mini-card">
-            <span>Super admins</span>
-            <strong>{formatNumber(counters?.activeSuperAdmins || 0)}</strong>
-          </div>
+              <p>
+                This dashboard provides a consolidated operational summary of
+                the platform, including election participation, voter
+                verification distribution, and recent administrative events.
+              </p>
 
-          <div className="admin-hero-mini-card">
-            <span>Approved candidates</span>
-            <strong>{formatNumber(counters?.approvedCandidates || 0)}</strong>
-          </div>
-
-          <div className="admin-hero-mini-card">
-            <span>7-day audit activity</span>
-            <strong>{formatNumber(counters?.recentAuditCount || 0)}</strong>
-          </div>
-        </div>
-      </div>
-
-      <div className="admin-dashboard__stats">
-        <StatCard
-          title="Total Users"
-          value={counters?.totalUsers || 0}
-          subtitle="All accounts currently present in the system"
-          icon={Users}
-          tone="primary"
-        />
-
-        <StatCard
-          title="Total Votes"
-          value={counters?.totalVotes || 0}
-          subtitle="All vote records cast across elections"
-          icon={Vote}
-          tone="cyan"
-        />
-
-        <StatCard
-          title="Approved Voters"
-          value={counters?.approvedVoters || 0}
-          subtitle="Verified voter accounts cleared for participation"
-          icon={UserCheck}
-          tone="green"
-        />
-
-        <StatCard
-          title="Pending Approvals"
-          value={counters?.pendingVoters || 0}
-          subtitle="Registrations still waiting for verification"
-          icon={Clock3}
-          tone="amber"
-        />
-      </div>
-
-      <div className="admin-dashboard__quick-metrics">
-        <div className="admin-quick-chip">
-          <Shield size={15} />
-          Active Admins: {formatNumber(counters?.activeAdmins || 0)}
-        </div>
-
-        <div className="admin-quick-chip">
-          <Briefcase size={15} />
-          Total Posts: {formatNumber(counters?.totalPosts || 0)}
-        </div>
-
-        <div className="admin-quick-chip">
-          <UserSquare2 size={15} />
-          Total Candidates: {formatNumber(counters?.totalCandidates || 0)}
-        </div>
-
-        <div className="admin-quick-chip">
-          <AlertTriangle size={15} />
-          Rejected Voters: {formatNumber(counters?.rejectedVoters || 0)}
-        </div>
-      </div>
-
-      <div className="admin-dashboard__grid">
-        <Panel
-          title="Election Status Distribution"
-          description="How elections are currently spread across upcoming, active, and ended states."
-          tall
-        >
-          {electionStatusData.some((item) => item.value > 0) ? (
-            <div className="admin-chart admin-chart--md">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={electionStatusData} barCategoryGap={28}>
-                  <CartesianGrid
-                    stroke="rgba(255,255,255,0.08)"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="name"
-                    stroke="#94a3b8"
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    allowDecimals={false}
-                    stroke="#94a3b8"
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      background: "rgba(8, 15, 30, 0.96)",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      borderRadius: 14,
-                    }}
-                  />
-                  <Bar dataKey="value" radius={[12, 12, 0, 0]}>
-                    {electionStatusData.map((entry, index) => (
-                      <Cell
-                        key={`${entry.name}-${index}`}
-                        fill={
-                          ELECTION_BAR_COLORS[
-                            index % ELECTION_BAR_COLORS.length
-                          ]
-                        }
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <EmptyPanelState label="No election status data available yet." />
-          )}
-        </Panel>
-
-        <Panel
-          title="Voter Verification Breakdown"
-          description="Use this to instantly see approval backlog and verification health."
-          tall
-        >
-          {voterApprovalData.some((item) => item.value > 0) ? (
-            <div className="admin-chart admin-chart--md">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={voterApprovalData}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={72}
-                    outerRadius={112}
-                    paddingAngle={4}
-                  >
-                    {voterApprovalData.map((entry, index) => (
-                      <Cell
-                        key={`${entry.name}-${index}`}
-                        fill={PIE_COLORS[index % PIE_COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      background: "rgba(8, 15, 30, 0.96)",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      borderRadius: 14,
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <EmptyPanelState label="No voter verification data available yet." />
-          )}
-
-          <div className="admin-legend-list">
-            {voterApprovalData.map((item, index) => (
-              <div key={item.name} className="admin-legend-item">
-                <span
-                  className="admin-legend-item__dot"
-                  style={{
-                    background: PIE_COLORS[index % PIE_COLORS.length],
-                  }}
-                />
-                <span className="admin-legend-item__label">{item.name}</span>
-                <strong className="admin-legend-item__value">
-                  {formatNumber(item.value)}
-                </strong>
-              </div>
-            ))}
-          </div>
-        </Panel>
-
-        <Panel
-          title="System Volume Snapshot"
-          description="A clean view of scale across users, voters, posts, candidates, and votes."
-          action={
-            <span className="admin-panel__pill">
-              Updated from dashboard summary API
-            </span>
-          }
-        >
-          {systemOverviewData.some((item) => item.value > 0) ? (
-            <div className="admin-chart admin-chart--lg">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={systemOverviewData}>
-                  <defs>
-                    <linearGradient
-                      id="systemVolumeFill"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop
-                        offset="0%"
-                        stopColor="#6d72ff"
-                        stopOpacity={0.45}
-                      />
-                      <stop
-                        offset="100%"
-                        stopColor="#6d72ff"
-                        stopOpacity={0.02}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    stroke="rgba(255,255,255,0.08)"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="name"
-                    stroke="#94a3b8"
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    allowDecimals={false}
-                    stroke="#94a3b8"
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      background: "rgba(8, 15, 30, 0.96)",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      borderRadius: 14,
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="value"
-                    stroke="#6d72ff"
-                    strokeWidth={3}
-                    fill="url(#systemVolumeFill)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <EmptyPanelState label="No system volume data available yet." />
-          )}
-        </Panel>
-
-        <Panel
-          title="Top Elections by Votes"
-          description="This should quickly expose which elections are generating the most participation."
-          tall
-        >
-          {topActiveElectionsByVotes.length > 0 ? (
-            <div className="admin-election-list">
-              {topActiveElectionsByVotes.map((item, index) => (
-                <div
-                  key={`${item?.electionId || item?.title}-${index}`}
-                  className="admin-election-list__item"
+              <div className="admin-dashboard__hero-actions">
+                <Link
+                  className="admin-cta-btn admin-cta-btn--primary"
+                  to={APP_ROUTES.ADMIN_ELECTIONS}
                 >
-                  <div className="admin-election-list__rank">#{index + 1}</div>
+                  Manage Elections
+                  <ArrowRight size={16} />
+                </Link>
 
-                  <div className="admin-election-list__content">
-                    <div className="admin-election-list__top">
-                      <h4>{item?.title || "Untitled election"}</h4>
-                      <span className="admin-election-list__votes">
-                        {formatNumber(item?.totalVotes || 0)} votes
-                      </span>
+                <Link
+                  className="admin-cta-btn admin-cta-btn--secondary"
+                  to={APP_ROUTES.ADMIN_RESULTS}
+                >
+                  Open Results Analytics
+                </Link>
+              </div>
+
+              <div className="admin-dashboard__quick-metrics">
+                <span className="admin-quick-chip">
+                  <Vote size={15} />
+                  Total votes: {safeNumber(stats.totalVotes)}
+                </span>
+
+                <span className="admin-quick-chip">
+                  <Users size={15} />
+                  Total voters: {safeNumber(stats.totalVoters)}
+                </span>
+
+                <span className="admin-quick-chip">
+                  <BadgeCheck size={15} />
+                  Active elections: {safeNumber(stats.activeElections)}
+                </span>
+              </div>
+            </div>
+
+            <div className="admin-dashboard__hero-grid">
+              <div className="admin-hero-mini-card">
+                <span>Total elections</span>
+                <strong>{safeNumber(stats.totalElections)}</strong>
+              </div>
+
+              <div className="admin-hero-mini-card">
+                <span>Total voters</span>
+                <strong>{safeNumber(stats.totalVoters)}</strong>
+              </div>
+
+              <div className="admin-hero-mini-card">
+                <span>Pending approvals</span>
+                <strong>{safeNumber(stats.pendingVoters)}</strong>
+              </div>
+
+              <div className="admin-hero-mini-card">
+                <span>Total admins</span>
+                <strong>{safeNumber(stats.totalAdmins)}</strong>
+              </div>
+            </div>
+          </section>
+
+          <section className="admin-dashboard__stats">
+            <StatCard
+              label="Total Elections"
+              value={safeNumber(stats.totalElections)}
+              meta="All elections currently registered in the system."
+              icon={Vote}
+              tone="primary"
+            />
+
+            <StatCard
+              label="Active Elections"
+              value={safeNumber(stats.activeElections)}
+              meta="Elections currently open for participation."
+              icon={BadgeCheck}
+              tone="cyan"
+            />
+
+            <StatCard
+              label="Verified Voters"
+              value={safeNumber(stats.verifiedVoters)}
+              meta="Voter accounts that have completed approval requirements."
+              icon={UserCheck}
+              tone="green"
+            />
+
+            <StatCard
+              label="Pending Voters"
+              value={safeNumber(stats.pendingVoters)}
+              meta="Accounts currently waiting for administrative review."
+              icon={Clock3}
+              tone="amber"
+            />
+          </section>
+
+          <section className="admin-dashboard__grid">
+            <article className="admin-panel admin-panel--tall">
+              <div className="admin-panel__header">
+                <div>
+                  <h3>Vote Trend Overview</h3>
+                  <p>Track voting activity across recent reporting dates.</p>
+                </div>
+                <span className="admin-panel__pill">Trend</span>
+              </div>
+
+              <div className="admin-panel__body">
+                {voteTrendChartData.length ? (
+                  <div className="admin-chart admin-chart--md">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={voteTrendChartData}>
+                        <defs>
+                          <linearGradient
+                            id="votesArea"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="5%"
+                              stopColor="#6d72ff"
+                              stopOpacity={0.45}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="#6d72ff"
+                              stopOpacity={0.04}
+                            />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="rgba(255,255,255,0.08)"
+                        />
+                        <XAxis dataKey="label" stroke="#8fa3bc" />
+                        <YAxis stroke="#8fa3bc" />
+                        <Tooltip />
+                        <Area
+                          type="monotone"
+                          dataKey="votes"
+                          stroke="#6d72ff"
+                          fillOpacity={1}
+                          fill="url(#votesArea)"
+                          strokeWidth={3}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="admin-empty-state">
+                    <p>No vote trend data is available yet.</p>
+                  </div>
+                )}
+              </div>
+            </article>
+
+            <article className="admin-panel admin-panel--tall">
+              <div className="admin-panel__header">
+                <div>
+                  <h3>Verification Breakdown</h3>
+                  <p>Review voter verification states across the platform.</p>
+                </div>
+                <span className="admin-panel__pill">Distribution</span>
+              </div>
+
+              <div className="admin-panel__body">
+                {verificationChartData.length ? (
+                  <>
+                    <div className="admin-chart admin-chart--md">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={verificationChartData}
+                            dataKey="value"
+                            nameKey="label"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={100}
+                            innerRadius={58}
+                          >
+                            {verificationChartData.map((entry, index) => (
+                              <Cell
+                                key={`${entry.label}-${index}`}
+                                fill={CHART_COLORS[index % CHART_COLORS.length]}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
                     </div>
 
-                    <div className="admin-election-list__meta">
-                      <span
-                        className={`admin-status-pill admin-status-pill--${String(item?.status || "upcoming").toLowerCase()}`}
+                    <div className="admin-legend-list">
+                      {verificationChartData.map((entry, index) => (
+                        <div key={entry.label} className="admin-legend-item">
+                          <span
+                            className="admin-legend-item__dot"
+                            style={{
+                              background:
+                                CHART_COLORS[index % CHART_COLORS.length],
+                            }}
+                          />
+                          <span className="admin-legend-item__label">
+                            {entry.label}
+                          </span>
+                          <strong className="admin-legend-item__value">
+                            {entry.value}
+                          </strong>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="admin-empty-state">
+                    <p>No verification breakdown data is available yet.</p>
+                  </div>
+                )}
+              </div>
+            </article>
+
+            <article className="admin-panel">
+              <div className="admin-panel__header">
+                <div>
+                  <h3>Election Comparison</h3>
+                  <p>Compare visible vote totals across the top elections.</p>
+                </div>
+                <span className="admin-panel__pill">
+                  <BarChart3 size={14} />
+                </span>
+              </div>
+
+              <div className="admin-panel__body">
+                {electionChartData.length ? (
+                  <div className="admin-chart admin-chart--lg">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={electionChartData}>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="rgba(255,255,255,0.08)"
+                        />
+                        <XAxis dataKey="shortTitle" stroke="#8fa3bc" />
+                        <YAxis stroke="#8fa3bc" />
+                        <Tooltip />
+                        <Legend />
+                        <Bar
+                          dataKey="totalVotes"
+                          fill="#13c8e6"
+                          radius={[8, 8, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="admin-empty-state">
+                    <p>No election comparison data is available yet.</p>
+                  </div>
+                )}
+              </div>
+            </article>
+
+            <article className="admin-panel">
+              <div className="admin-panel__header">
+                <div>
+                  <h3>Operational Comparison</h3>
+                  <p>Compare recent vote counts with verification counts.</p>
+                </div>
+                <span className="admin-panel__pill">
+                  <Activity size={14} />
+                </span>
+              </div>
+
+              <div className="admin-panel__body">
+                {operationalTrendData.length ? (
+                  <div className="admin-chart admin-chart--lg">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={operationalTrendData}>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="rgba(255,255,255,0.08)"
+                        />
+                        <XAxis dataKey="label" stroke="#8fa3bc" />
+                        <YAxis stroke="#8fa3bc" />
+                        <Tooltip />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="votes"
+                          stroke="#6d72ff"
+                          strokeWidth={3}
+                          dot={{ r: 4 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="approvals"
+                          stroke="#22c55e"
+                          strokeWidth={3}
+                          dot={{ r: 4 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="admin-empty-state">
+                    <p>No operational comparison data is available yet.</p>
+                  </div>
+                )}
+              </div>
+            </article>
+
+            <article className="admin-panel">
+              <div className="admin-panel__header">
+                <div>
+                  <h3>Top Elections by Activity</h3>
+                  <p>Review elections with the highest recorded vote volume.</p>
+                </div>
+                <Link
+                  to={APP_ROUTES.ADMIN_RESULTS}
+                  className="admin-panel__pill"
+                >
+                  Results
+                </Link>
+              </div>
+
+              <div className="admin-panel__body">
+                {topElections.length ? (
+                  <div className="admin-election-list">
+                    {topElections.map((election, index) => {
+                      const votes = safeNumber(election?.totalVotes);
+                      const width = `${(votes / maxElectionVotes) * 100}%`;
+
+                      return (
+                        <article
+                          key={
+                            election.electionId || `${election.title}-${index}`
+                          }
+                          className="admin-election-list__item"
+                        >
+                          <div className="admin-election-list__rank">
+                            {index + 1}
+                          </div>
+
+                          <div className="admin-election-list__content">
+                            <div className="admin-election-list__top">
+                              <h4>{election?.title || "Election"}</h4>
+                              <span className="admin-election-list__votes">
+                                {votes} votes
+                              </span>
+                            </div>
+
+                            <div className="admin-election-list__meta">
+                              <span
+                                className={getStatusToneClass(election?.status)}
+                              >
+                                {election?.status || "upcoming"}
+                              </span>
+                            </div>
+
+                            <div className="admin-progress">
+                              <div
+                                className="admin-progress__bar"
+                                style={{ width }}
+                              />
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="admin-empty-state">
+                    <p>No election activity data is available yet.</p>
+                  </div>
+                )}
+              </div>
+            </article>
+
+            <article className="admin-panel">
+              <div className="admin-panel__header">
+                <div>
+                  <h3>Recent Administrative Actions</h3>
+                  <p>
+                    Track the most recent audit events recorded by the system.
+                  </p>
+                </div>
+                <Link
+                  to={APP_ROUTES.ADMIN_SYSTEM}
+                  className="admin-panel__pill"
+                >
+                  Audit Log
+                </Link>
+              </div>
+
+              <div className="admin-panel__body">
+                {latestAuditLogs.length ? (
+                  <div className="admin-audit-list">
+                    {latestAuditLogs.map((log, index) => (
+                      <article
+                        key={log._id || `${log.action}-${index}`}
+                        className="admin-audit-item"
                       >
-                        {String(item?.status || "upcoming")}
-                      </span>
-                      <span>
-                        {item?.isPublished
-                          ? "Published"
-                          : "Draft / Unpublished"}
-                      </span>
-                    </div>
+                        <div className="admin-audit-item__marker" />
 
-                    <div className="admin-progress">
-                      <div
-                        className="admin-progress__bar"
-                        style={{
-                          width: `${
-                            topActiveElectionsByVotes[0]?.totalVotes
-                              ? Math.max(
-                                  12,
-                                  Math.round(
-                                    ((item?.totalVotes || 0) /
-                                      topActiveElectionsByVotes[0].totalVotes) *
-                                      100,
-                                  ),
-                                )
-                              : 12
-                          }%`,
-                        }}
-                      />
-                    </div>
+                        <div className="admin-audit-item__body">
+                          <div className="admin-audit-item__top">
+                            <h4>{log?.action || "Administrative action"}</h4>
+                            <span>
+                              {log?.createdAt
+                                ? new Date(log.createdAt).toLocaleString()
+                                : "-"}
+                            </span>
+                          </div>
+
+                          <p className="admin-audit-item__desc">
+                            {log?.description ||
+                              "No description available for this event."}
+                          </p>
+
+                          <div className="admin-audit-item__meta">
+                            <span className="admin-role-chip">
+                              <Shield size={13} />
+                              {log?.actorId?.role || "system"}
+                            </span>
+
+                            <span>{log?.actorId?.fullName || "System"}</span>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="admin-empty-state">
+                    <p>No recent audit entries are available.</p>
+                  </div>
+                )}
+              </div>
+            </article>
+
+            <article className="admin-panel">
+              <div className="admin-panel__header">
+                <div>
+                  <h3>Operational Summary</h3>
+                  <p>Key platform counts for administration and monitoring.</p>
+                </div>
+                <span className="admin-panel__pill">
+                  <AlertTriangle size={14} />
+                </span>
+              </div>
+
+              <div className="admin-panel__body">
+                <div className="admin-legend-list">
+                  <div className="admin-legend-item">
+                    <span
+                      className="admin-legend-item__dot"
+                      style={{ background: "#6d72ff" }}
+                    />
+                    <span className="admin-legend-item__label">
+                      Total votes cast
+                    </span>
+                    <strong className="admin-legend-item__value">
+                      {safeNumber(stats.totalVotes)}
+                    </strong>
+                  </div>
+
+                  <div className="admin-legend-item">
+                    <span
+                      className="admin-legend-item__dot"
+                      style={{ background: "#13c8e6" }}
+                    />
+                    <span className="admin-legend-item__label">
+                      Active admins
+                    </span>
+                    <strong className="admin-legend-item__value">
+                      {safeNumber(stats.activeAdmins)}
+                    </strong>
+                  </div>
+
+                  <div className="admin-legend-item">
+                    <span
+                      className="admin-legend-item__dot"
+                      style={{ background: "#22c55e" }}
+                    />
+                    <span className="admin-legend-item__label">
+                      Approved candidates
+                    </span>
+                    <strong className="admin-legend-item__value">
+                      {safeNumber(stats.approvedCandidates)}
+                    </strong>
+                  </div>
+
+                  <div className="admin-legend-item">
+                    <span
+                      className="admin-legend-item__dot"
+                      style={{ background: "#f59e0b" }}
+                    />
+                    <span className="admin-legend-item__label">
+                      Pending voters
+                    </span>
+                    <strong className="admin-legend-item__value">
+                      {safeNumber(stats.pendingVoters)}
+                    </strong>
+                  </div>
+
+                  <div className="admin-legend-item">
+                    <span
+                      className="admin-legend-item__dot"
+                      style={{ background: "#ef4444" }}
+                    />
+                    <span className="admin-legend-item__label">
+                      Rejected voters
+                    </span>
+                    <strong className="admin-legend-item__value">
+                      {safeNumber(stats.rejectedVoters)}
+                    </strong>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyPanelState label="No election vote ranking data available yet." />
-          )}
-        </Panel>
-
-        <Panel
-          title="Recent Audit Activity"
-          description="Last recorded system operations. This is critical for trust, tracking, and governance."
-          tall
-        >
-          {recentAuditLogs.length > 0 ? (
-            <div className="admin-audit-list">
-              {recentAuditLogs.map((log, index) => {
-                const actorName =
-                  log?.actorId?.fullName ||
-                  log?.actorId?.email ||
-                  "Unknown actor";
-
-                const actorRole = log?.actorId?.role || "unknown";
-
-                const action = log?.action || "Unknown action";
-
-                const description =
-                  log?.description ||
-                  log?.details ||
-                  "No description available.";
-
-                return (
-                  <article
-                    key={log?._id || `${action}-${index}`}
-                    className="admin-audit-item"
-                  >
-                    <div className="admin-audit-item__marker" />
-
-                    <div className="admin-audit-item__body">
-                      <div className="admin-audit-item__top">
-                        <h4>{action}</h4>
-                        <span>
-                          {log?.createdAt
-                            ? new Date(log.createdAt).toLocaleString()
-                            : "Unknown time"}
-                        </span>
-                      </div>
-
-                      <p className="admin-audit-item__desc">{description}</p>
-
-                      <div className="admin-audit-item__meta">
-                        <span>{actorName}</span>
-                        <span className="admin-role-chip">
-                          {String(actorRole).replaceAll("_", " ")}
-                        </span>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
-            <EmptyPanelState label="No audit logs available yet." />
-          )}
-        </Panel>
-      </div>
+              </div>
+            </article>
+          </section>
+        </>
+      )}
     </section>
   );
 }

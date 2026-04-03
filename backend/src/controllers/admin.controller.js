@@ -458,7 +458,12 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
     }),
   ]);
 
-  const [recentAuditLogs, topActiveElectionsByVotes] = await Promise.all([
+  const [
+    recentAuditLogs,
+    topActiveElectionsByVotes,
+    voteTrendsData,
+    verificationBreakdownData,
+  ] = await Promise.all([
     AuditLog.find({})
       .populate("actorId", "fullName email role")
       .sort({ createdAt: -1 })
@@ -500,13 +505,57 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
         },
       },
     ]),
+    Vote.aggregate([
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$createdAt",
+            },
+          },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { _id: 1 },
+      },
+      {
+        $limit: 30,
+      },
+      {
+        $project: {
+          _id: 0,
+          date: "$_id",
+          votes: "$count",
+        },
+      },
+    ]),
+    User.aggregate([
+      {
+        $match: { role: "voter" },
+      },
+      {
+        $group: {
+          _id: "$verificationStatus",
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          status: "$_id",
+          count: 1,
+        },
+      },
+    ]),
   ]);
 
   return res.status(200).json(
     new ApiResponse(
       200,
       {
-        counters: {
+        stats: {
           totalUsers,
           totalVoters,
           pendingVoters,
@@ -523,9 +572,13 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
           approvedCandidates,
           totalVotes,
           recentAuditCount,
+          verifiedVoters: approvedVoters,
+          totalAdmins: activeAdmins + activeSuperAdmins,
         },
-        recentAuditLogs,
-        topActiveElectionsByVotes,
+        auditLogs: recentAuditLogs,
+        elections: topActiveElectionsByVotes,
+        voteTrends: voteTrendsData,
+        verificationBreakdown: verificationBreakdownData,
       },
       "Dashboard summary fetched successfully",
     ),
