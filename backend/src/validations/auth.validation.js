@@ -33,13 +33,24 @@ const dobSchema = z
   }, "Invalid date of birth");
 
 export const sendOtpSchema = z.object({
-  body: z.object({
-    mobileNumber: mobileNumberSchema,
-    purpose: z
-      .enum(["register", "login", "reset-password"])
-      .optional()
-      .default("register"),
-  }),
+  body: z
+    .object({
+      mobileNumber: mobileNumberSchema,
+      email: emailSchema.optional(),
+      purpose: z
+        .enum(["register", "login", "reset-password"])
+        .optional()
+        .default("register"),
+    })
+    .superRefine((data, ctx) => {
+      if (data.purpose === "register" && !data.email) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["email"],
+          message: "Email is required to send registration OTP",
+        });
+      }
+    }),
   params: z.object({}).optional().default({}),
   query: z.object({}).optional().default({}),
 });

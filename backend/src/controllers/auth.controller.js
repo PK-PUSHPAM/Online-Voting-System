@@ -307,7 +307,7 @@ export const sendOtp = asyncHandler(async (req, res) => {
   const mobileNumber = normalizeMobileNumber(body.mobileNumber);
 
   const existingUser = await User.findOne({ mobileNumber }).select(
-    "_id role isActive mobileVerified verificationStatus",
+    "_id email role isActive mobileVerified verificationStatus",
   );
 
   if (purpose === "register" && existingUser) {
