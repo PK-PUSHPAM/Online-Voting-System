@@ -1,4 +1,7 @@
+import dns from "dns";
 import nodemailer from "nodemailer";
+
+dns.setDefaultResultOrder("ipv4first");
 
 let transporter = null;
 
@@ -15,8 +18,8 @@ const getTransporter = () => {
     return transporter;
   }
 
-  const emailUser = process.env.EMAIL_USER;
-  const emailPass = process.env.EMAIL_PASS;
+  const emailUser = String(process.env.EMAIL_USER || "").trim();
+  const emailPass = String(process.env.EMAIL_PASS || "").trim();
 
   if (!emailUser || !emailPass) {
     throw new Error(
@@ -24,28 +27,46 @@ const getTransporter = () => {
     );
   }
 
-  const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
-  const smtpPort = Number(process.env.SMTP_PORT || 465);
+  const smtpHost = String(process.env.SMTP_HOST || "smtp.gmail.com").trim();
+  const smtpPort = Number(process.env.SMTP_PORT || 587);
   const smtpSecure = getBooleanEnv(process.env.SMTP_SECURE, smtpPort === 465);
 
   transporter = nodemailer.createTransport({
     host: smtpHost,
     port: smtpPort,
     secure: smtpSecure,
+
+    /**
+     * Important:
+     * Render sometimes tries Gmail SMTP through IPv6.
+     * Your logs show ENETUNREACH for IPv6 address.
+     * family: 4 forces IPv4 connection.
+     */
+    family: 4,
+
     auth: {
       user: emailUser,
       pass: emailPass,
     },
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 15000,
+
+    requireTLS: smtpPort === 587,
+
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000,
+
+    tls: {
+      servername: smtpHost,
+    },
   });
 
   return transporter;
 };
 
 const sendEmail = async ({ to, subject, text, html }) => {
-  if (!to) {
+  const recipient = String(to || "").trim();
+
+  if (!recipient) {
     throw new Error("Email recipient is required.");
   }
 
@@ -58,11 +79,11 @@ const sendEmail = async ({ to, subject, text, html }) => {
   }
 
   const fromName = process.env.EMAIL_FROM_NAME || "Online Voting System";
-  const fromEmail = process.env.EMAIL_USER;
+  const fromEmail = String(process.env.EMAIL_USER || "").trim();
 
   const mailOptions = {
     from: `"${fromName}" <${fromEmail}>`,
-    to,
+    to: recipient,
     subject,
     text,
     html,
@@ -73,7 +94,7 @@ const sendEmail = async ({ to, subject, text, html }) => {
     const result = await activeTransporter.sendMail(mailOptions);
 
     console.log("OTP email sent successfully:", {
-      to,
+      to: recipient,
       subject,
       messageId: result.messageId,
       accepted: result.accepted,
@@ -83,7 +104,7 @@ const sendEmail = async ({ to, subject, text, html }) => {
     return result;
   } catch (error) {
     console.error("OTP email sending failed:", {
-      to,
+      to: recipient,
       subject,
       code: error.code,
       command: error.command,
@@ -93,7 +114,7 @@ const sendEmail = async ({ to, subject, text, html }) => {
 
     throw new Error(
       error.message ||
-        "OTP email could not be sent. Check EMAIL_USER, EMAIL_PASS and SMTP env variables.",
+        "OTP email could not be sent. Check backend deployment EMAIL_USER, EMAIL_PASS and SMTP env variables.",
     );
   }
 };
