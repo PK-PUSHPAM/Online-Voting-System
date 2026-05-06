@@ -303,16 +303,28 @@ const verifyOtpRecord = async ({ mobileNumber, otp, purpose }) => {
 
 export const sendOtp = asyncHandler(async (req, res) => {
   const { body } = req.validatedData || { body: req.body };
+
   const purpose = body.purpose || "register";
   const mobileNumber = normalizeMobileNumber(body.mobileNumber);
-  const requestEmail = body.email ? normalizeEmail(body.email) : "";
+  const emailFromBody = normalizeEmail(body.email || req.body?.email || "");
 
-  const existingUser = await User.findOne({ mobileNumber }).select(
-    "_id email role isActive mobileVerified verificationStatus",
+  const existingUser = await User.findOne({
+    $or: [
+      { mobileNumber },
+      ...(emailFromBody ? [{ email: emailFromBody }] : []),
+    ],
+  }).select(
+    "_id role isActive mobileVerified verificationStatus email mobileNumber",
   );
 
   if (purpose === "register" && existingUser) {
-    throw new ApiError(409, "User already exists with this mobile number");
+    if (existingUser.mobileNumber === mobileNumber) {
+      throw new ApiError(409, "User already exists with this mobile number");
+    }
+
+    if (existingUser.email === emailFromBody) {
+      throw new ApiError(409, "User already exists with this email address");
+    }
   }
 
   if ((purpose === "login" || purpose === "reset-password") && !existingUser) {
@@ -327,17 +339,12 @@ export const sendOtp = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Your account is inactive");
   }
 
-  const emailRecipient =
-    purpose === "register"
-      ? requestEmail
-      : normalizeEmail(existingUser?.email || "");
+  const emailRecipient = existingUser?.email || emailFromBody;
 
   if (!emailRecipient) {
     throw new ApiError(
       400,
-      purpose === "register"
-        ? "Email is required to send registration OTP"
-        : "This account does not have an email address. Please contact support.",
+      "Email address is required to send OTP. Please enter a valid email address.",
     );
   }
 
@@ -365,29 +372,102 @@ export const sendOtp = asyncHandler(async (req, res) => {
   });
 
   const otp = generateOtp();
+  const hashedOtp = hashOtpCode(otp);
   const expiresAt = new Date(Date.now() + OTP_EXPIRY_IN_MS);
 
-  const emailMessage = `Your OTP for Online Voting System is ${otp}. It is valid for 5 minutes.`;
-  const emailHtml = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
-      <h2 style="margin: 0 0 12px;">Online Voting System OTP</h2>
-      <p style="margin: 0 0 12px;">Use this OTP to continue:</p>
-      <div style="font-size: 28px; font-weight: 700; letter-spacing: 6px; margin: 16px 0;">${otp}</div>
-      <p style="margin: 0;">This OTP is valid for 5 minutes.</p>
-      <p style="margin: 12px 0 0; color: #6b7280;">Do not share this OTP with anyone.</p>
-    </div>
-  `;
-
-  let emailDelivery = null;
+  const otpRecord = await Otp.create({
+    mobileNumber,
+    otp: hashedOtp,
+    purpose,
+    expiresAt,
+  });
 
   try {
-    emailDelivery = await sendEmail({
+    const emailText = `Your OTP for Online Voting System is ${otp}. It is valid for 5 minutes. Do not share this OTP with anyone.`;
+
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; background: #f8fafc; padding: 24px;">
+        <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 28px; border: 1px solid #e5e7eb;">
+          <h2 style="margin: 0 0 12px; color: #111827;">Online Voting System OTP</h2>
+          <p style="margin: 0 0 18px; color: #4b5563; font-size: 15px;">
+            Use the OTP below to continue your verification process.
+          </p>
+          <div style="font-size: 32px; letter-spacing: 8px; font-weight: 700; color: #2563eb; background: #eff6ff; padding: 18px; text-align: center; border-radius: 12px;">
+            ${otp}
+          </div>
+          <p style="margin: 18px 0 0; color: #6b7280; font-size: 14px;">
+            This OTP is valid for 5 minutes. Do not share it with anyone.
+          </p>
+        </div>
+      </div>
+    `;
+
+    await sendEmail({
       to: emailRecipient,
-      subject: "Online Voting System OTP Verification",
-      text: emailMessage,
+      subject: "OTP Verification - Online Voting System",
+      text: emailText,
       html: emailHtml,
     });
+
+    let smsDelivery = null;
+    const smsProvider = String(process.env.SMS_PROVIDER || "disabled")
+      .trim()
+      .toLowerCase();
+
+    const shouldTrySms =
+      smsProvider &&
+      smsProvider !== "disabled" &&
+      smsProvider !== "none" &&
+      smsProvider !== "mock";
+
+    if (shouldTrySms) {
+      try {
+        smsDelivery = await sendOtpToMobile({
+          mobileNumber,
+          otp,
+          purpose,
+        });
+      } catch (smsError) {
+        console.warn("SMS OTP failed, but email OTP was already sent:", {
+          mobileNumber,
+          purpose,
+          reason: smsError.message,
+        });
+      }
+    }
+
+    await createAuditLog({
+      req,
+      actorId: existingUser?._id || null,
+      actorRole: existingUser?.role || "unknown",
+      action: "auth.send_otp",
+      targetType: "User",
+      targetId: existingUser?._id || null,
+      status: "success",
+      meta: {
+        mobileNumber,
+        email: emailRecipient,
+        purpose,
+        deliveryMode: smsDelivery?.provider ? "email+sms" : "email",
+      },
+    });
+
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          mobileNumber,
+          email: emailRecipient,
+          purpose,
+          expiresAt,
+          deliveryMode: smsDelivery?.provider ? "email+sms" : "email",
+        },
+        "OTP sent successfully to email",
+      ),
+    );
   } catch (error) {
+    await Otp.deleteOne({ _id: otpRecord._id });
+
     await createAuditLog({
       req,
       actorId: existingUser?._id || null,
@@ -400,58 +480,15 @@ export const sendOtp = asyncHandler(async (req, res) => {
         mobileNumber,
         email: emailRecipient,
         purpose,
-        deliveryMode: "email",
         reason: error.message,
       },
     });
 
     throw new ApiError(
       502,
-      `OTP email could not be sent. Check backend deployment EMAIL_USER/EMAIL_PASS/SMTP env variables. ${error.message}`,
+      "OTP email could not be sent. Check backend deployment EMAIL_USER, EMAIL_PASS and SMTP env variables.",
     );
   }
-
-  const hashedOtp = hashOtpCode(otp);
-
-  const otpRecord = await Otp.create({
-    mobileNumber,
-    otp: hashedOtp,
-    purpose,
-    expiresAt,
-  });
-
-  await createAuditLog({
-    req,
-    actorId: existingUser?._id || null,
-    actorRole: existingUser?.role || "unknown",
-    action: "auth.send_otp",
-    targetType: "User",
-    targetId: existingUser?._id || null,
-    status: "success",
-    meta: {
-      mobileNumber,
-      email: emailRecipient,
-      purpose,
-      deliveryMode: "email",
-      messageId: emailDelivery?.messageId || "",
-      accepted: emailDelivery?.accepted || [],
-      rejected: emailDelivery?.rejected || [],
-    },
-  });
-
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        mobileNumber,
-        email: emailRecipient.replace(/(^.).*(@.*$)/, "$1***$2"),
-        purpose,
-        expiresAt: otpRecord.expiresAt,
-        deliveryMode: "email",
-      },
-      "OTP email sent successfully",
-    ),
-  );
 });
 
 export const verifyOtpAndRegister = asyncHandler(async (req, res) => {

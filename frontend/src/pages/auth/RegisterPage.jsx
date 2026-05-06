@@ -192,7 +192,7 @@ export default function RegisterPage() {
       });
 
       setOtpSent(true);
-      toast.success("OTP sent successfully.");
+      toast.success("OTP sent successfully to your email.");
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     } finally {
