@@ -355,7 +355,12 @@ export const sendOtp = asyncHandler(async (req, res) => {
   const emailMessage = `Your OTP is ${otp}. It is valid for 5 minutes.`;
   const emailRecipient = existingUser?.email || req.body.email;
 
-  console.log("Attempting to send OTP email to:", emailRecipient);
+  console.log(
+    "Attempting to send OTP email to:",
+    emailRecipient,
+    "\n email",
+    req.body.email,
+  );
 
   try {
     if (!emailRecipient) {
