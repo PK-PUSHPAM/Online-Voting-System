@@ -4,17 +4,13 @@ let transporter = null;
 
 const normalizeAppPassword = (password = "") => password.replace(/\s/g, "");
 
-const getTransporter = () => {
-  if (transporter) {
-    return transporter;
-  }
-
+const getSmtpConfig = () => {
   const emailUser = process.env.EMAIL_USER?.trim();
   const emailPass = normalizeAppPassword(process.env.EMAIL_PASS || "");
 
   if (!emailUser || !emailPass) {
     throw new Error(
-      "Email credentials are missing. Set EMAIL_USER and EMAIL_PASS in your deployment environment variables.",
+      "Email credentials are missing. Set EMAIL_USER and EMAIL_PASS in deployment environment variables.",
     );
   }
 
@@ -24,6 +20,23 @@ const getTransporter = () => {
     process.env.SMTP_SECURE === undefined
       ? smtpPort === 465
       : process.env.SMTP_SECURE === "true";
+
+  return {
+    emailUser,
+    emailPass,
+    smtpHost,
+    smtpPort,
+    smtpSecure,
+  };
+};
+
+const getTransporter = () => {
+  if (transporter) {
+    return transporter;
+  }
+
+  const { emailUser, emailPass, smtpHost, smtpPort, smtpSecure } =
+    getSmtpConfig();
 
   transporter = nodemailer.createTransport({
     host: smtpHost,
@@ -41,16 +54,22 @@ const getTransporter = () => {
   return transporter;
 };
 
-const sendEmail = async ({ to, subject, text, html }) => {
-  const emailUser = process.env.EMAIL_USER?.trim();
+export const verifyEmailTransporter = async () => {
+  const mailTransporter = getTransporter();
+  return mailTransporter.verify();
+};
 
-  if (!to) {
+const sendEmail = async ({ to, subject, text, html }) => {
+  const { emailUser } = getSmtpConfig();
+  const recipient = to?.trim();
+
+  if (!recipient) {
     throw new Error("Email recipient is required");
   }
 
   const mailOptions = {
     from: `"${process.env.EMAIL_FROM_NAME || "Online Voting System"}" <${emailUser}>`,
-    to,
+    to: recipient,
     subject,
     text,
     html,
@@ -60,22 +79,35 @@ const sendEmail = async ({ to, subject, text, html }) => {
     const mailTransporter = getTransporter();
     const result = await mailTransporter.sendMail(mailOptions);
 
-    console.log("✅ OTP email sent", {
-      to,
+    console.log("✅ OTP email SMTP result", {
+      to: recipient,
       subject,
       messageId: result.messageId,
       accepted: result.accepted,
       rejected: result.rejected,
+      response: result.response,
     });
+
+    if (
+      !Array.isArray(result.accepted) ||
+      !result.accepted.includes(recipient)
+    ) {
+      throw new Error(
+        `SMTP server did not accept recipient. Accepted: ${JSON.stringify(
+          result.accepted || [],
+        )}, Rejected: ${JSON.stringify(result.rejected || [])}`,
+      );
+    }
 
     return result;
   } catch (error) {
     console.error("❌ OTP email sending failed", {
-      to,
+      to: recipient,
       subject,
       code: error.code,
       command: error.command,
       response: error.response,
+      responseCode: error.responseCode,
       message: error.message,
     });
 
