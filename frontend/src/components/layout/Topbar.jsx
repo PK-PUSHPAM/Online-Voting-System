@@ -92,19 +92,35 @@ export default function Topbar({ onOpenSidebar = () => {} }) {
   }, [user?.fullName]);
 
   return (
-    <header className="admin-topbar">
+    <header
+      className="admin-topbar"
+      style={{
+        background:
+          "linear-gradient(135deg, rgba(24, 24, 44, 0.88), rgba(17, 24, 39, 0.82))",
+        border: "1px solid rgba(255,255,255,0.08)",
+        boxShadow: "0 20px 60px rgba(15, 23, 42, 0.24)",
+      }}
+    >
       <div className="admin-topbar__left">
         <button
           type="button"
           className="admin-topbar__menu-btn"
           onClick={onOpenSidebar}
           aria-label="Open sidebar"
+          style={{
+            background:
+              "linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(6, 182, 212, 0.14))",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}
         >
           <Menu size={20} />
         </button>
 
         <div className="admin-topbar__title-wrap">
-          <span className="admin-topbar__eyebrow">{meta.eyebrow}</span>
+          <span className="admin-topbar__eyebrow" style={{ color: "#f472b6" }}>
+            {meta.eyebrow}
+          </span>
+
           <h1>{meta.title}</h1>
           <p>{meta.description}</p>
         </div>
@@ -116,12 +132,33 @@ export default function Topbar({ onOpenSidebar = () => {} }) {
           className="admin-topbar__ghost-btn"
           aria-label="Notifications"
           title="Notifications"
+          style={{
+            background:
+              "linear-gradient(135deg, rgba(6, 182, 212, 0.16), rgba(139, 92, 246, 0.12))",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}
         >
           <Bell size={18} />
         </button>
 
-        <div className="admin-topbar__profile">
-          <div className="admin-topbar__avatar">{initials}</div>
+        <div
+          className="admin-topbar__profile"
+          style={{
+            background:
+              "linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}
+        >
+          <div
+            className="admin-topbar__avatar"
+            style={{
+              background:
+                "linear-gradient(135deg, #8b5cf6 0%, #06b6d4 55%, #f472b6 100%)",
+              boxShadow: "0 14px 28px rgba(139, 92, 246, 0.24)",
+            }}
+          >
+            {initials}
+          </div>
 
           <div className="admin-topbar__profile-text">
             <strong>{user?.fullName || "Admin User"}</strong>
@@ -141,8 +178,26 @@ export default function Topbar({ onOpenSidebar = () => {} }) {
           </div>
         </div>
 
-        <div className="admin-topbar__profile">
-          <div className="admin-topbar__avatar">
+        <div
+          className="admin-topbar__profile"
+          style={{
+            background: isActive
+              ? "linear-gradient(135deg, rgba(52, 211, 153, 0.12), rgba(6, 182, 212, 0.08))"
+              : "linear-gradient(135deg, rgba(251, 113, 133, 0.12), rgba(244, 114, 182, 0.08))",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}
+        >
+          <div
+            className="admin-topbar__avatar"
+            style={{
+              background: isActive
+                ? "linear-gradient(135deg, #34d399, #06b6d4)"
+                : "linear-gradient(135deg, #fb7185, #f472b6)",
+              boxShadow: isActive
+                ? "0 14px 28px rgba(52, 211, 153, 0.22)"
+                : "0 14px 28px rgba(244, 114, 182, 0.22)",
+            }}
+          >
             {isActive ? <BadgeCheck size={16} /> : <Activity size={16} />}
           </div>
 
@@ -157,6 +212,11 @@ export default function Topbar({ onOpenSidebar = () => {} }) {
           className="admin-topbar__logout-btn"
           onClick={logout}
           disabled={isAuthActionLoading}
+          style={{
+            background:
+              "linear-gradient(135deg, #8b5cf6 0%, #f472b6 52%, #f59e0b 100%)",
+            boxShadow: "0 18px 34px rgba(244, 114, 182, 0.24)",
+          }}
         >
           <LogOut size={16} />
           {isAuthActionLoading ? "Signing out..." : "Logout"}
