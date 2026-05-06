@@ -5,7 +5,9 @@ import {
   ArrowRight,
   CalendarClock,
   Clock3,
+  Search,
   ShieldCheck,
+  TimerReset,
   Vote,
 } from "lucide-react";
 import { voterService } from "../../services/voter.service";
@@ -13,7 +15,14 @@ import { buildVoterElectionDetailsRoute } from "../../lib/routes";
 import { getApiErrorMessage } from "../../lib/utils";
 import "../../styles/voter.css";
 
-const formatDate = (value) => {
+const tabs = [
+  { id: "all", label: "All elections" },
+  { id: "upcoming", label: "Upcoming" },
+  { id: "active", label: "Active now" },
+  { id: "verified", label: "Verified access" },
+];
+
+function formatDate(value) {
   if (!value) return "-";
 
   try {
@@ -24,10 +33,50 @@ const formatDate = (value) => {
   } catch {
     return "-";
   }
-};
+}
+
+function isEndingSoon(value) {
+  if (!value) return false;
+
+  const end = new Date(value).getTime();
+  if (Number.isNaN(end)) return false;
+
+  const diff = end - Date.now();
+  return diff > 0 && diff <= 1000 * 60 * 60 * 24 * 2;
+}
+
+function getElectionStatusMeta(election) {
+  if (election?.status === "upcoming") {
+    return {
+      label: "Upcoming",
+      className: "status-chip status-chip--amber",
+      actionText: "View Details",
+      icon: TimerReset,
+    };
+  }
+
+  if (election?.status === "active") {
+    return {
+      label: isEndingSoon(election?.endDate) ? "Ending soon" : "Open now",
+      className: isEndingSoon(election?.endDate)
+        ? "status-chip status-chip--amber"
+        : "status-chip status-chip--green",
+      actionText: "Open Ballot",
+      icon: Vote,
+    };
+  }
+
+  return {
+    label: "Unavailable",
+    className: "status-chip",
+    actionText: "View Details",
+    icon: Vote,
+  };
+}
 
 export default function VoterElectionsPage() {
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("all");
   const [elections, setElections] = useState([]);
   const [search, setSearch] = useState("");
 
@@ -35,7 +84,9 @@ export default function VoterElectionsPage() {
     const loadElections = async () => {
       try {
         setLoading(true);
-        const data = await voterService.getActiveElections();
+
+        const data = await voterService.getPublishedElections();
+
         setElections(Array.isArray(data?.elections) ? data.elections : []);
       } catch (error) {
         toast.error(getApiErrorMessage(error));
@@ -48,125 +99,190 @@ export default function VoterElectionsPage() {
     loadElections();
   }, []);
 
+  const electionStats = useMemo(() => {
+    return elections.reduce(
+      (stats, election) => {
+        if (election?.status === "upcoming") {
+          stats.upcoming += 1;
+        }
+
+        if (election?.status === "active") {
+          stats.active += 1;
+        }
+
+        if (election?.allowedVoterType !== "all") {
+          stats.verifiedOnly += 1;
+        }
+
+        return stats;
+      },
+      {
+        upcoming: 0,
+        active: 0,
+        verifiedOnly: 0,
+      },
+    );
+  }, [elections]);
+
   const filteredElections = useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
-    if (!keyword) return elections;
+    return elections
+      .filter((election) => {
+        if (activeTab === "upcoming") return election?.status === "upcoming";
+        if (activeTab === "active") return election?.status === "active";
+        if (activeTab === "verified")
+          return election?.allowedVoterType !== "all";
+        return true;
+      })
+      .filter((election) => {
+        if (!keyword) return true;
 
-    return elections.filter((election) => {
-      return (
-        String(election?.title || "")
-          .toLowerCase()
-          .includes(keyword) ||
-        String(election?.description || "")
-          .toLowerCase()
-          .includes(keyword)
-      );
-    });
-  }, [elections, search]);
+        return (
+          String(election?.title || "")
+            .toLowerCase()
+            .includes(keyword) ||
+          String(election?.description || "")
+            .toLowerCase()
+            .includes(keyword) ||
+          String(election?.status || "")
+            .toLowerCase()
+            .includes(keyword)
+        );
+      });
+  }, [activeTab, elections, search]);
 
   return (
-    <section className="voter-page">
-      <section className="voter-panel voter-panel--heroish">
-        <div className="voter-section-heading">
-          <div>
-            <h2>Active Elections</h2>
-            <p>
-              Browse the elections that are currently open and available to your
-              account. Use search to quickly locate a specific election.
-            </p>
-          </div>
-
-          <div className="voter-search-wrap">
-            <input
-              type="text"
-              className="voter-search-input"
-              placeholder="Search active elections"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </div>
+    <section className="voter-page voter-page--elections">
+      <section className="voter-page-hero voter-page-hero--mint">
+        <div>
+          <span className="voter-eyebrow">Election centre</span>
+          <h2>Published Elections</h2>
+          <p>
+            Upcoming elections are now visible before start time. Active
+            elections can be opened for voting, while upcoming elections are
+            shown for awareness and preparation.
+          </p>
         </div>
 
-        <div className="voter-summary-strip">
-          <div className="voter-summary-item">
-            <Vote size={18} />
-            <div>
-              <span>Total Active Elections</span>
-              <strong>{loading ? "..." : elections.length}</strong>
-            </div>
+        <div className="vcp-history-summary">
+          <div>
+            <TimerReset size={18} />
+            <span>Upcoming</span>
+            <strong>{loading ? "..." : electionStats.upcoming}</strong>
           </div>
 
-          <div className="voter-summary-item">
-            <ShieldCheck size={18} />
-            <div>
-              <span>Filtered Results</span>
-              <strong>{loading ? "..." : filteredElections.length}</strong>
-            </div>
+          <div>
+            <Vote size={18} />
+            <span>Active now</span>
+            <strong>{loading ? "..." : electionStats.active}</strong>
           </div>
         </div>
       </section>
 
-      {loading ? (
-        <div className="voter-empty-state voter-empty-state--lg">
-          Loading active elections...
-        </div>
-      ) : filteredElections.length ? (
-        <div className="voter-election-grid">
-          {filteredElections.map((election) => (
-            <article key={election._id} className="voter-election-card">
-              <div className="voter-election-card__top">
-                <span className="voter-election-card__badge">
-                  <Vote size={14} />
-                  Active Election
-                </span>
-
-                <span className="voter-tag">Published</span>
-              </div>
-
-              <div className="voter-election-card__body">
-                <h3>{election.title}</h3>
-                <p>
-                  {election.description ||
-                    "No election description is available at the moment."}
-                </p>
-              </div>
-
-              <div className="voter-election-card__meta">
-                <span>
-                  <CalendarClock size={15} />
-                  Starts: {formatDate(election.startDate)}
-                </span>
-
-                <span>
-                  <Clock3 size={15} />
-                  Ends: {formatDate(election.endDate)}
-                </span>
-
-                <span>
-                  <ShieldCheck size={15} />
-                  Access:{" "}
-                  {election.allowedVoterType === "all"
-                    ? "All voters"
-                    : "Verified only"}
-                </span>
-              </div>
-
-              <div className="voter-election-card__footer">
-                <Link
-                  className="voter-primary-btn voter-primary-btn--full"
-                  to={buildVoterElectionDetailsRoute(election._id)}
-                >
-                  Open Election
-                  <ArrowRight size={16} />
-                </Link>
-              </div>
-            </article>
+      <div className="voter-toolbar-card">
+        <div
+          className="voter-option-tabs"
+          role="tablist"
+          aria-label="Election options"
+        >
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={activeTab === tab.id ? "is-active" : ""}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
           ))}
         </div>
+
+        <label className="voter-search-box">
+          <Search size={17} />
+          <input
+            type="text"
+            placeholder="Search election"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
+      </div>
+
+      {loading ? (
+        <div className="voter-empty-box voter-empty-box--large">
+          Loading published elections...
+        </div>
+      ) : filteredElections.length ? (
+        <div className="voter-clean-election-grid">
+          {filteredElections.map((election) => {
+            const statusMeta = getElectionStatusMeta(election);
+            const StatusIcon = statusMeta.icon;
+
+            return (
+              <article
+                key={election._id}
+                className="voter-clean-card voter-election-card-clean"
+              >
+                <div className="voter-election-card-clean__top">
+                  <span className={statusMeta.className}>
+                    {statusMeta.label}
+                  </span>
+
+                  <StatusIcon size={20} />
+                </div>
+
+                <h3>{election?.title || "Election"}</h3>
+                <p>
+                  {election?.description ||
+                    "No election description is available."}
+                </p>
+
+                <div className="voter-election-meta-clean">
+                  <div>
+                    <CalendarClock size={15} />
+                    <span>Starts</span>
+                    <strong>{formatDate(election?.startDate)}</strong>
+                  </div>
+
+                  <div>
+                    <Clock3 size={15} />
+                    <span>Ends</span>
+                    <strong>{formatDate(election?.endDate)}</strong>
+                  </div>
+
+                  <div>
+                    <ShieldCheck size={15} />
+                    <span>Access</span>
+                    <strong>
+                      {election?.allowedVoterType === "all"
+                        ? "All voters"
+                        : "Verified only"}
+                    </strong>
+                  </div>
+                </div>
+
+                {election?.status === "upcoming" ? (
+                  <div className="voter-upcoming-note">
+                    Voting will open automatically when the election reaches its
+                    start date.
+                  </div>
+                ) : null}
+
+                <Link
+                  className="voter-clean-button voter-clean-button--full"
+                  to={buildVoterElectionDetailsRoute(election._id)}
+                >
+                  {statusMeta.actionText}
+                  <ArrowRight size={16} />
+                </Link>
+              </article>
+            );
+          })}
+        </div>
       ) : (
-        <div className="voter-empty-state voter-empty-state--lg">
-          No active elections match your current search.
+        <div className="voter-empty-box voter-empty-box--large">
+          No election found in this option. Change tab or clear the search.
         </div>
       )}
     </section>

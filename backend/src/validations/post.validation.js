@@ -60,7 +60,7 @@ export const updatePostSchema = z.object({
 
 export const deletePostSchema = getPostByIdSchema;
 
-export const getActivePostsWithCandidatesForElectionSchema = z.object({
+export const getVisiblePostsWithCandidatesForVoterSchema = z.object({
   body: emptyObjectSchema,
   params: z.object({
     electionId: mongoIdSchema("electionId"),

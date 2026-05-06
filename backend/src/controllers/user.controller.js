@@ -1,11 +1,18 @@
+import fs from "fs";
 import User from "../models/User.js";
 import Vote from "../models/Vote.js";
 import AuditLog from "../models/AuditLog.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
+import {
+  uploadOnCloudinary,
+  deleteFromCloudinary,
+} from "../utils/cloudinary.util.js";
 import { buildPagination } from "../utils/pagination.util.js";
 import { buildPaginationResponse } from "../utils/paginationResponse.util.js";
+
+const PROFILE_PHOTO_FOLDER = "online-voting-system/profile-photos";
 
 const getClientIp = (req) => {
   return (
@@ -40,6 +47,16 @@ const createAuditLog = async ({
     });
   } catch (error) {
     console.warn(`Audit log creation failed for ${action}: ${error.message}`);
+  }
+};
+
+const cleanupLocalFile = (filePath) => {
+  try {
+    if (filePath && fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (error) {
+    console.warn(`Failed to cleanup local file: ${error.message}`);
   }
 };
 
@@ -335,4 +352,153 @@ export const rejectVoter = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, updatedVoter, "Voter rejected successfully"));
+});
+
+export const updateMyProfile = asyncHandler(async (req, res) => {
+  const { body } = req.validatedData || { body: req.body };
+
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if (user.role !== "voter") {
+    throw new ApiError(403, "Only voters can update voter profile");
+  }
+
+  const identityChanged =
+    body.identityType !== undefined || body.identityLast4 !== undefined;
+
+  if (body.fullName !== undefined) {
+    user.fullName = body.fullName.trim();
+  }
+
+  if (body.identityType !== undefined) {
+    user.identityType = body.identityType;
+  }
+
+  if (body.identityLast4 !== undefined) {
+    user.identityLast4 = body.identityLast4.trim();
+  }
+
+  if (identityChanged) {
+    user.verificationStatus = "pending";
+    user.isEligibleToVote = false;
+    user.verifiedBy = null;
+    user.verifiedAt = null;
+    user.verificationRejectionReason = "";
+    user.verificationNotes =
+      "Voter updated identity information. Admin re-approval required.";
+  }
+
+  await user.save({ validateBeforeSave: false });
+
+  const updatedUser = await User.findById(user._id).select(
+    "-password -refreshToken",
+  );
+
+  await createAuditLog({
+    req,
+    actorId: req.user._id,
+    actorRole: req.user.role,
+    action: "user.update_my_profile",
+    targetType: "User",
+    targetId: user._id,
+    status: "success",
+    meta: {
+      identityChanged,
+      updatedFields: Object.keys(body),
+    },
+  });
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        user: updatedUser,
+        identityChanged,
+      },
+      identityChanged
+        ? "Profile updated successfully. Identity changes require admin re-approval."
+        : "Profile updated successfully",
+    ),
+  );
+});
+
+export const uploadMyProfilePhoto = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(400, "Profile photo is required");
+  }
+
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    cleanupLocalFile(req.file.path);
+    throw new ApiError(404, "User not found");
+  }
+
+  if (user.role !== "voter") {
+    cleanupLocalFile(req.file.path);
+    throw new ApiError(403, "Only voters can upload voter profile photo");
+  }
+
+  const uploadedImage = await uploadOnCloudinary(req.file.path, {
+    folder: PROFILE_PHOTO_FOLDER,
+    resourceType: "image",
+  });
+
+  cleanupLocalFile(req.file.path);
+
+  if (!uploadedImage?.secure_url || !uploadedImage?.public_id) {
+    throw new ApiError(500, "Failed to upload profile photo");
+  }
+
+  const oldProfilePhotoPublicId = user.profilePhotoPublicId;
+
+  user.profilePhotoUrl = uploadedImage.secure_url;
+  user.profilePhotoPublicId = uploadedImage.public_id;
+
+  await user.save({ validateBeforeSave: false });
+
+  if (
+    oldProfilePhotoPublicId &&
+    oldProfilePhotoPublicId !== uploadedImage.public_id
+  ) {
+    try {
+      await deleteFromCloudinary(oldProfilePhotoPublicId, {
+        resourceType: "image",
+      });
+    } catch (error) {
+      console.warn(`Failed to delete old profile photo: ${error.message}`);
+    }
+  }
+
+  const updatedUser = await User.findById(user._id).select(
+    "-password -refreshToken",
+  );
+
+  await createAuditLog({
+    req,
+    actorId: req.user._id,
+    actorRole: req.user.role,
+    action: "user.upload_my_profile_photo",
+    targetType: "User",
+    targetId: user._id,
+    status: "success",
+    meta: {
+      profilePhotoPublicId: user.profilePhotoPublicId,
+    },
+  });
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        user: updatedUser,
+        profilePhotoUrl: user.profilePhotoUrl,
+      },
+      "Profile photo uploaded successfully",
+    ),
+  );
 });

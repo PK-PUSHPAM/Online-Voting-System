@@ -1,9 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
-import { CheckCircle2, Layers3, Vote, CalendarClock } from "lucide-react";
+import {
+  CalendarClock,
+  CheckCircle2,
+  Layers3,
+  Search,
+  Vote,
+} from "lucide-react";
 import { voteService } from "../../services/vote.service";
 import { getApiErrorMessage } from "../../lib/utils";
 import "../../styles/voter.css";
+import "../../styles/voter-clean-pages.css";
+
+const VOTES_PAGE_LIMIT = 10;
+
+const tabs = [
+  { id: "all", label: "All votes" },
+  { id: "recent", label: "Recent" },
+  { id: "grouped", label: "By election" },
+];
 
 function formatDate(value) {
   if (!value) return "-";
@@ -18,34 +33,91 @@ function formatDate(value) {
   }
 }
 
+function PaginationControls({ pagination, onPrev, onNext }) {
+  if (!pagination || pagination.totalPages <= 1) return null;
+
+  return (
+    <div className="vcp-toolbar">
+      <span className="vcp-status-chip">
+        Page {pagination.currentPage} of {pagination.totalPages}
+      </span>
+
+      <div className="voter-hero__actions">
+        <button
+          type="button"
+          className="voter-secondary-btn"
+          onClick={onPrev}
+          disabled={!pagination.hasPrevPage}
+        >
+          Previous
+        </button>
+
+        <button
+          type="button"
+          className="voter-primary-btn"
+          onClick={onNext}
+          disabled={!pagination.hasNextPage}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function VoterMyVotesPage() {
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("all");
   const [votes, setVotes] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
     const loadVotes = async () => {
       try {
         setLoading(true);
-        const data = await voteService.getMyVotes({ page: 1, limit: 100 });
+
+        const data = await voteService.getMyVotes({
+          page,
+          limit: VOTES_PAGE_LIMIT,
+        });
+
         setVotes(Array.isArray(data?.items) ? data.items : []);
+        setPagination(data?.pagination || null);
       } catch (error) {
         toast.error(getApiErrorMessage(error));
         setVotes([]);
+        setPagination(null);
       } finally {
         setLoading(false);
       }
     };
 
     loadVotes();
-  }, []);
+  }, [page]);
 
-  const filteredVotes = useMemo(() => {
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab]);
+
+  const searchedVotes = useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
-    if (!keyword) return votes;
+    let baseVotes = [...votes].sort((first, second) => {
+      return (
+        new Date(second?.createdAt || 0).getTime() -
+        new Date(first?.createdAt || 0).getTime()
+      );
+    });
 
-    return votes.filter((vote) => {
+    if (activeTab === "recent") {
+      baseVotes = baseVotes.slice(0, 10);
+    }
+
+    if (!keyword) return baseVotes;
+
+    return baseVotes.filter((vote) => {
       return (
         String(vote?.candidateId?.fullName || "")
           .toLowerCase()
@@ -61,116 +133,188 @@ export default function VoterMyVotesPage() {
           .includes(keyword)
       );
     });
-  }, [votes, search]);
+  }, [activeTab, search, votes]);
 
-  const uniqueElectionCount = useMemo(() => {
-    return (
-      new Set(
-        filteredVotes.map((item) => item?.electionId?._id).filter(Boolean),
-      ).size || 0
-    );
-  }, [filteredVotes]);
+  const groupedVotes = useMemo(() => {
+    const map = new Map();
+
+    for (const vote of searchedVotes) {
+      const electionId = vote?.electionId?._id || "unknown";
+      const electionTitle = vote?.electionId?.title || "Unknown Election";
+
+      if (!map.has(electionId)) {
+        map.set(electionId, {
+          electionId,
+          electionTitle,
+          votes: [],
+        });
+      }
+
+      map.get(electionId).votes.push(vote);
+    }
+
+    return Array.from(map.values());
+  }, [searchedVotes]);
+
+  const currentPageElectionCount = useMemo(() => {
+    return new Set(votes.map((vote) => vote?.electionId?._id).filter(Boolean))
+      .size;
+  }, [votes]);
+
+  const handlePrevPage = () => {
+    setPage((currentPage) => Math.max(currentPage - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setPage((currentPage) => {
+      const totalPages = pagination?.totalPages || currentPage;
+      return Math.min(currentPage + 1, totalPages);
+    });
+  };
 
   return (
-    <section className="voter-page">
-      <section className="voter-panel voter-panel--heroish">
-        <div className="voter-section-heading">
-          <div>
-            <h2>My Votes</h2>
-            <p>
-              Review the vote records associated with your account, including
-              the selected candidate, post, election, and submission time.
-            </p>
-          </div>
-
-          <div className="voter-search-wrap">
-            <input
-              type="text"
-              className="voter-search-input"
-              placeholder="Search by candidate, post, election, or party"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </div>
+    <section className="voter-page vcp-page">
+      <section className="vcp-hero vcp-hero--history">
+        <div>
+          <span className="vcp-eyebrow">Vote history</span>
+          <h2>My Votes</h2>
+          <p>
+            Your vote records are loaded with proper pagination. Each request
+            fetches only {VOTES_PAGE_LIMIT} records, which keeps the UI and API
+            lighter.
+          </p>
         </div>
 
-        <div className="voter-summary-strip">
-          <div className="voter-summary-item">
+        <div className="vcp-history-summary">
+          <div>
             <Layers3 size={18} />
-            <div>
-              <span>Total Vote Records</span>
-              <strong>{loading ? "..." : votes.length}</strong>
-            </div>
+            <span>Total votes</span>
+            <strong>{loading ? "..." : pagination?.totalItems || 0}</strong>
           </div>
 
-          <div className="voter-summary-item">
+          <div>
             <Vote size={18} />
-            <div>
-              <span>Filtered Results</span>
-              <strong>{loading ? "..." : filteredVotes.length}</strong>
-            </div>
-          </div>
-
-          <div className="voter-summary-item">
-            <CalendarClock size={18} />
-            <div>
-              <span>Unique Elections</span>
-              <strong>{loading ? "..." : uniqueElectionCount}</strong>
-            </div>
+            <span>This page elections</span>
+            <strong>{loading ? "..." : currentPageElectionCount}</strong>
           </div>
         </div>
       </section>
 
-      {loading ? (
-        <div className="voter-empty-state voter-empty-state--lg">
-          Loading your vote records...
-        </div>
-      ) : filteredVotes.length ? (
-        <div className="voter-votes-list">
-          {filteredVotes.map((vote) => (
-            <article key={vote._id} className="voter-vote-card">
-              <div className="voter-vote-card__icon">
-                <CheckCircle2 size={18} />
-              </div>
-
-              <div className="voter-vote-card__content">
-                <div className="voter-vote-card__top">
-                  <h3>{vote?.candidateId?.fullName || "Candidate"}</h3>
-                  <span className="voter-tag voter-tag--success">Recorded</span>
-                </div>
-
-                <div className="voter-vote-card__grid">
-                  <div>
-                    <span>Election</span>
-                    <strong>{vote?.electionId?.title || "-"}</strong>
-                  </div>
-
-                  <div>
-                    <span>Post</span>
-                    <strong>{vote?.postId?.title || "-"}</strong>
-                  </div>
-
-                  <div>
-                    <span>Party</span>
-                    <strong>
-                      {vote?.candidateId?.partyName || "Independent"}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Voted At</span>
-                    <strong>{formatDate(vote?.createdAt)}</strong>
-                  </div>
-                </div>
-              </div>
-            </article>
+      <section className="vcp-toolbar">
+        <div className="vcp-tabs" role="tablist" aria-label="Vote history tabs">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={activeTab === tab.id ? "is-active" : ""}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
           ))}
         </div>
+
+        <label className="vcp-search-box">
+          <Search size={17} />
+          <input
+            type="text"
+            placeholder="Search current page"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
+      </section>
+
+      {loading ? (
+        <div className="vcp-empty vcp-empty--large">
+          Loading your vote records...
+        </div>
+      ) : activeTab === "grouped" ? (
+        groupedVotes.length ? (
+          <div className="vcp-grouped-stack">
+            {groupedVotes.map((group) => (
+              <section key={group.electionId} className="vcp-card">
+                <div className="vcp-card-header">
+                  <div>
+                    <h3>{group.electionTitle}</h3>
+                    <p>
+                      {group.votes.length} vote record(s) on this current page.
+                    </p>
+                  </div>
+
+                  <span className="vcp-status-chip">{group.votes.length}</span>
+                </div>
+
+                <div className="vcp-vote-list">
+                  {group.votes.map((vote) => (
+                    <VoteRow key={vote._id} vote={vote} />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <div className="vcp-empty vcp-empty--large">
+            No grouped vote records found on this page.
+          </div>
+        )
+      ) : searchedVotes.length ? (
+        <section className="vcp-card">
+          <div className="vcp-card-header">
+            <div>
+              <h3>{activeTab === "recent" ? "Recent votes" : "All votes"}</h3>
+              <p>
+                Showing records from page {pagination?.currentPage || page}.
+                Search applies to the currently loaded page only.
+              </p>
+            </div>
+
+            <span className="vcp-status-chip">
+              {searchedVotes.length} shown
+            </span>
+          </div>
+
+          <div className="vcp-vote-list">
+            {searchedVotes.map((vote) => (
+              <VoteRow key={vote._id} vote={vote} />
+            ))}
+          </div>
+        </section>
       ) : (
-        <div className="voter-empty-state voter-empty-state--lg">
-          No vote records match your current search.
+        <div className="vcp-empty vcp-empty--large">
+          No vote records match your current option or search.
         </div>
       )}
+
+      <PaginationControls
+        pagination={pagination}
+        onPrev={handlePrevPage}
+        onNext={handleNextPage}
+      />
     </section>
+  );
+}
+
+function VoteRow({ vote }) {
+  return (
+    <article className="vcp-vote-row">
+      <div className="vcp-vote-row__icon">
+        <CheckCircle2 size={17} />
+      </div>
+
+      <div>
+        <h4>{vote?.candidateId?.fullName || "Candidate"}</h4>
+        <p>
+          {vote?.postId?.title || "Post"} •{" "}
+          {vote?.candidateId?.partyName || "Independent"}
+        </p>
+        <small>{vote?.electionId?.title || "Election"}</small>
+      </div>
+
+      <span>
+        <CalendarClock size={14} />
+        {formatDate(vote?.createdAt)}
+      </span>
+    </article>
   );
 }

@@ -1,20 +1,27 @@
+import { useMemo, useState } from "react";
 import { NavLink } from "react-router-dom";
 import {
-  LayoutDashboard,
-  Vote,
-  CheckCircle2,
-  ShieldCheck,
+  BadgeCheck,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CircleUserRound,
+  FileCheck2,
+  LayoutDashboard,
+  ListChecks,
+  LogOut,
+  ShieldCheck,
+  Vote,
   X,
-  Sparkles,
-  UserCircle2,
-  Clock3,
-  BadgeCheck,
-  XCircle,
 } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { APP_ROUTES } from "../../lib/routes";
+
+function getStatusLabel(value = "pending") {
+  return String(value)
+    .replaceAll("_", " ")
+    .replace(/^./, (letter) => letter.toUpperCase());
+}
 
 function SidebarLink({
   to,
@@ -30,14 +37,15 @@ function SidebarLink({
       end={end}
       title={isCollapsed ? label : undefined}
       className={({ isActive }) =>
-        `admin-sidebar__link ${isActive ? "admin-sidebar__link--active" : ""}`
+        `voter-side-link ${isActive ? "voter-side-link--active" : ""}`
       }
       onClick={onNavigate}
     >
-      <span className="admin-sidebar__link-icon">
+      <span className="voter-side-link__icon">
         <Icon size={18} />
       </span>
-      <span className="admin-sidebar__link-label">{label}</span>
+
+      {!isCollapsed && <span className="voter-side-link__label">{label}</span>}
     </NavLink>
   );
 }
@@ -48,7 +56,23 @@ export default function VoterSidebar({
   isDesktopCollapsed = false,
   onDesktopToggle = () => {},
 }) {
-  const { user } = useAuth();
+  const { user, logout, isAuthActionLoading } = useAuth();
+  const [isVotingGroupOpen, setIsVotingGroupOpen] = useState(true);
+
+  const initials = useMemo(() => {
+    const name = String(user?.fullName || "Voter").trim();
+    const parts = name.split(/\s+/).filter(Boolean);
+
+    if (parts.length === 1) {
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+
+    return `${parts[0]?.[0] || ""}${parts[1]?.[0] || ""}`.toUpperCase();
+  }, [user?.fullName]);
+
+  const verificationStatus = getStatusLabel(user?.verificationStatus);
+  const isApproved =
+    String(user?.verificationStatus || "").toLowerCase() === "approved";
 
   const handleNavigate = () => {
     if (isMobileOpen) {
@@ -56,49 +80,35 @@ export default function VoterSidebar({
     }
   };
 
-  const verificationStatus = String(user?.verificationStatus || "pending");
-  const verificationTitle =
-    verificationStatus.charAt(0).toUpperCase() + verificationStatus.slice(1);
-  const isEligible = Boolean(user?.isEligibleToVote);
-  const isMobileVerified = Boolean(user?.mobileVerified);
-
-  const initials = String(user?.fullName || "Voter")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
-
   return (
     <>
       <aside
         className={[
-          "admin-sidebar",
-          "voter-sidebar",
-          isMobileOpen ? "admin-sidebar--mobile-open" : "",
-          isDesktopCollapsed ? "admin-sidebar--collapsed" : "",
+          "voter-sidebar-clean",
+          isMobileOpen ? "voter-sidebar-clean--mobile-open" : "",
+          isDesktopCollapsed ? "voter-sidebar-clean--collapsed" : "",
         ]
           .filter(Boolean)
           .join(" ")}
       >
-        <div className="admin-sidebar__top">
-          <div className="admin-sidebar__brand">
-            <div className="admin-sidebar__brand-mark">
-              <Vote size={18} />
+        <div className="voter-sidebar-clean__top">
+          <div className="voter-sidebar-clean__brand">
+            <div className="voter-sidebar-clean__brand-icon">
+              <Vote size={20} />
             </div>
 
-            <div className="admin-sidebar__brand-text">
-              <strong>VoteX Pro</strong>
-              <span>Secure voter workspace</span>
-            </div>
+            {!isDesktopCollapsed && (
+              <div>
+                <strong>VoteX</strong>
+                <span>Voter panel</span>
+              </div>
+            )}
           </div>
 
-          <div className="admin-sidebar__top-actions">
+          <div className="voter-sidebar-clean__actions">
             <button
               type="button"
-              className="admin-sidebar__icon-btn admin-sidebar__desktop-toggle"
+              className="voter-sidebar-clean__icon-btn voter-sidebar-clean__desktop-toggle"
               onClick={onDesktopToggle}
               aria-label="Toggle sidebar"
             >
@@ -111,7 +121,7 @@ export default function VoterSidebar({
 
             <button
               type="button"
-              className="admin-sidebar__icon-btn admin-sidebar__mobile-close"
+              className="voter-sidebar-clean__icon-btn voter-sidebar-clean__mobile-close"
               onClick={onClose}
               aria-label="Close sidebar"
             >
@@ -120,50 +130,47 @@ export default function VoterSidebar({
           </div>
         </div>
 
-        <div className="admin-sidebar__account-card">
-          <div className="admin-sidebar__account-avatar">
-            {initials || "VT"}
-          </div>
-
-          <div className="admin-sidebar__account-copy">
-            <strong>{user?.fullName || "Voter"}</strong>
-            <span>Voter account</span>
-          </div>
-        </div>
-
-        <div className="admin-sidebar__status-stack">
-          <div className="admin-sidebar__role-card voter-sidebar__role-card">
-            <div className="admin-sidebar__role-icon">
-              <Sparkles size={16} />
+        {!isDesktopCollapsed && (
+          <div className="voter-sidebar-clean__profile">
+            <div className="voter-sidebar-clean__avatar voter-sidebar-clean__avatar--photo">
+              {user?.profilePhotoUrl ? (
+                <img
+                  src={user.profilePhotoUrl}
+                  alt={user?.fullName || "Voter"}
+                />
+              ) : (
+                <span>{initials || "VT"}</span>
+              )}
             </div>
 
             <div>
-              <p className="admin-sidebar__role-label">Panel access</p>
-              <h4 className="admin-sidebar__role-title">
-                Verified Voter Space
-              </h4>
+              <strong>{user?.fullName || "Voter"}</strong>
+              <span>{user?.email || "No email"}</span>
             </div>
           </div>
+        )}
 
-          <div className="admin-sidebar__mini-status">
-            <span className="admin-sidebar__mini-badge">
-              <ShieldCheck size={14} />
-              {verificationTitle}
-            </span>
-
-            <span className="admin-sidebar__mini-badge">
-              {isEligible ? <BadgeCheck size={14} /> : <XCircle size={14} />}
-              {isEligible ? "Eligible to vote" : "Not eligible"}
-            </span>
-
-            <span className="admin-sidebar__mini-badge">
-              <Clock3 size={14} />
-              {isMobileVerified ? "Mobile verified" : "Mobile pending"}
-            </span>
+        {!isDesktopCollapsed && (
+          <div
+            className={`voter-sidebar-clean__status ${
+              isApproved
+                ? "voter-sidebar-clean__status--success"
+                : "voter-sidebar-clean__status--warning"
+            }`}
+          >
+            <ShieldCheck size={16} />
+            <div>
+              <strong>{verificationStatus}</strong>
+              <span>
+                {isApproved
+                  ? "Voting access enabled"
+                  : "Approval still required"}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
 
-        <nav className="admin-sidebar__nav">
+        <nav className="voter-sidebar-clean__nav">
           <SidebarLink
             to={APP_ROUTES.VOTER_DASHBOARD}
             end
@@ -173,43 +180,93 @@ export default function VoterSidebar({
             isCollapsed={isDesktopCollapsed}
           />
 
-          <SidebarLink
-            to={APP_ROUTES.VOTER_ELECTIONS}
-            icon={Vote}
-            label="Active Elections"
-            onNavigate={handleNavigate}
-            isCollapsed={isDesktopCollapsed}
-          />
+          <div className="voter-sidebar-clean__group">
+            <button
+              type="button"
+              className="voter-sidebar-clean__group-btn"
+              onClick={() => setIsVotingGroupOpen((prev) => !prev)}
+              title={isDesktopCollapsed ? "Voting" : undefined}
+            >
+              <span className="voter-side-link__icon">
+                <Vote size={18} />
+              </span>
 
-          <SidebarLink
-            to={APP_ROUTES.VOTER_MY_VOTES}
-            icon={CheckCircle2}
-            label="My Votes"
-            onNavigate={handleNavigate}
-            isCollapsed={isDesktopCollapsed}
-          />
+              {!isDesktopCollapsed && (
+                <>
+                  <span>Voting</span>
+                  <ChevronDown
+                    size={16}
+                    className={
+                      isVotingGroupOpen
+                        ? "voter-sidebar-clean__chevron voter-sidebar-clean__chevron--open"
+                        : "voter-sidebar-clean__chevron"
+                    }
+                  />
+                </>
+              )}
+            </button>
+
+            {(isVotingGroupOpen || isDesktopCollapsed) && (
+              <div className="voter-sidebar-clean__subnav">
+                <SidebarLink
+                  to={APP_ROUTES.VOTER_ELECTIONS}
+                  icon={ListChecks}
+                  label="Published Elections"
+                  onNavigate={handleNavigate}
+                  isCollapsed={isDesktopCollapsed}
+                />
+
+                <SidebarLink
+                  to={APP_ROUTES.VOTER_MY_VOTES}
+                  icon={FileCheck2}
+                  label="My Votes"
+                  onNavigate={handleNavigate}
+                  isCollapsed={isDesktopCollapsed}
+                />
+              </div>
+            )}
+          </div>
 
           <SidebarLink
             to={APP_ROUTES.VOTER_PROFILE}
-            icon={UserCircle2}
-            label="Profile & Status"
+            icon={CircleUserRound}
+            label="Profile"
             onNavigate={handleNavigate}
             isCollapsed={isDesktopCollapsed}
           />
         </nav>
 
-        <div className="admin-sidebar__footer">
-          <p>
-            Voter screen simple honi chahiye. Election dikho, status dikho, vote
-            karo. Extra noise sirf UX ko kharab karta hai.
-          </p>
+        <div className="voter-sidebar-clean__bottom">
+          {!isDesktopCollapsed && (
+            <div className="voter-sidebar-clean__mini-info">
+              <BadgeCheck size={16} />
+              <span>
+                {user?.isEligibleToVote
+                  ? "Eligible voter"
+                  : "Eligibility pending"}
+              </span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="voter-sidebar-clean__logout"
+            onClick={logout}
+            disabled={isAuthActionLoading}
+            title={isDesktopCollapsed ? "Logout" : undefined}
+          >
+            <LogOut size={17} />
+            {!isDesktopCollapsed && (
+              <span>{isAuthActionLoading ? "Signing out..." : "Logout"}</span>
+            )}
+          </button>
         </div>
       </aside>
 
       {isMobileOpen && (
         <button
           type="button"
-          className="admin-sidebar__backdrop"
+          className="voter-sidebar-clean__backdrop"
           onClick={onClose}
           aria-label="Close sidebar backdrop"
         />

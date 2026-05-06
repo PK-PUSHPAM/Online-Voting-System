@@ -9,6 +9,7 @@ import {
   updateElection,
   deleteElection,
   getActivePublishedElectionsForVoter,
+  getPublishedElectionsForVoter,
 } from "../controllers/election.controller.js";
 import {
   createElectionSchema,
@@ -17,6 +18,7 @@ import {
   updateElectionSchema,
   deleteElectionSchema,
   getActivePublishedElectionsForVoterSchema,
+  getPublishedElectionsForVoterSchema,
 } from "../validations/election.validation.js";
 
 const router = express.Router();
@@ -35,6 +37,22 @@ router.get(
   authorizeRoles("admin", "super_admin"),
   validate(getAllElectionsSchema),
   getAllElections,
+);
+
+router.get(
+  "/voter/published",
+  verifyJWT,
+  authorizeRoles("voter"),
+  validate(getPublishedElectionsForVoterSchema),
+  getPublishedElectionsForVoter,
+);
+
+router.get(
+  "/voter/active",
+  verifyJWT,
+  authorizeRoles("voter"),
+  validate(getActivePublishedElectionsForVoterSchema),
+  getActivePublishedElectionsForVoter,
 );
 
 router.get(
@@ -59,14 +77,6 @@ router.delete(
   authorizeRoles("admin", "super_admin"),
   validate(deleteElectionSchema),
   deleteElection,
-);
-
-router.get(
-  "/voter/active",
-  verifyJWT,
-  authorizeRoles("voter"),
-  validate(getActivePublishedElectionsForVoterSchema),
-  getActivePublishedElectionsForVoter,
 );
 
 export default router;

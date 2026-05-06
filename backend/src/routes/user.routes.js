@@ -2,21 +2,41 @@ import express from "express";
 import verifyJWT from "../middleware/auth.middleware.js";
 import authorizeRoles from "../middleware/role.middleware.js";
 import validate from "../middleware/validate.middleware.js";
+import { uploadProfilePhoto } from "../middleware/profilePhotoUpload.middleware.js";
 import {
   getPendingVoters,
   getAllVoters,
   getVoterById,
   approveVoter,
   rejectVoter,
+  updateMyProfile,
+  uploadMyProfilePhoto,
 } from "../controllers/user.controller.js";
 import {
   getPendingVotersSchema,
   getAllVotersSchema,
   getVoterByIdSchema,
   approveRejectVoterSchema,
+  updateMyProfileSchema,
 } from "../validations/user.validation.js";
 
 const router = express.Router();
+
+router.patch(
+  "/me/profile",
+  verifyJWT,
+  authorizeRoles("voter"),
+  validate(updateMyProfileSchema),
+  updateMyProfile,
+);
+
+router.patch(
+  "/me/profile-photo",
+  verifyJWT,
+  authorizeRoles("voter"),
+  uploadProfilePhoto,
+  uploadMyProfilePhoto,
+);
 
 router.get(
   "/pending-voters",

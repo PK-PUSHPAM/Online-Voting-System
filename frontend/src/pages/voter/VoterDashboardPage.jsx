@@ -1,592 +1,560 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import {
-  ShieldCheck,
-  FileText,
-  Upload,
-  CheckCircle2,
-  Info,
+  BadgeCheck,
   CalendarClock,
-  UserPlus,
-  Trash2,
+  CheckCircle2,
+  Clock3,
+  FileBadge2,
+  ShieldAlert,
+  ShieldCheck,
+  TimerReset,
+  UserCircle2,
+  Vote,
 } from "lucide-react";
-import AuthLayout from "../../components/layout/AuthLayout";
-import InputField from "../../components/common/InputField";
-import Button from "../../components/common/Button";
-import { authService } from "../../services/auth.service";
-import { uploadService } from "../../services/upload.service";
 import { useAuth } from "../../hooks/useAuth";
-import { APP_ROUTES } from "../../lib/routes";
+import { voterService } from "../../services/voter.service";
+import { voteService } from "../../services/vote.service";
+import { APP_ROUTES, buildVoterElectionDetailsRoute } from "../../lib/routes";
 import { getApiErrorMessage } from "../../lib/utils";
-import "../../styles/register-page.css";
-import "../../styles/auth-pages.css";
+import "../../styles/voter.css";
 
-const initialForm = {
-  fullName: "",
-  email: "",
-  mobileNumber: "",
-  password: "",
-  otp: "",
-  dob: "",
-  identityType: "other",
-  identityLast4: "",
-  documentUrl: "",
-  documentPublicId: "",
-};
+const VOTES_PAGE_LIMIT = 10;
 
-const identityTypeOptions = [
-  { value: "other", label: "Other" },
-  { value: "voterId", label: "Voter ID" },
-  { value: "collegeId", label: "College ID" },
-  { value: "aadhaarLast4", label: "Aadhaar Last 4" },
+const tabs = [
+  { id: "overview", label: "Overview" },
+  { id: "upcoming", label: "Upcoming" },
+  { id: "active", label: "Active Now" },
+  { id: "readiness", label: "Readiness" },
 ];
 
-const getAgeFromDob = (dob) => {
-  if (!dob) return null;
+function formatDate(value) {
+  if (!value) return "-";
 
-  const birthDate = new Date(dob);
-
-  if (Number.isNaN(birthDate.getTime())) {
-    return null;
+  try {
+    return new Intl.DateTimeFormat("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return "-";
   }
+}
 
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
+function formatStatus(value = "pending") {
+  return String(value)
+    .replaceAll("_", " ")
+    .replace(/^./, (letter) => letter.toUpperCase());
+}
 
-  if (
-    monthDiff < 0 ||
-    (monthDiff === 0 && today.getDate() < birthDate.getDate())
-  ) {
-    age -= 1;
-  }
+function getReadiness(user) {
+  const verificationStatus = String(
+    user?.verificationStatus || "pending",
+  ).toLowerCase();
 
-  return age;
-};
-
-export default function RegisterPage() {
-  const { register, isAuthActionLoading } = useAuth();
-  const fileInputRef = useRef(null);
-
-  const [form, setForm] = useState(initialForm);
-  const [errors, setErrors] = useState({});
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [documentUploadLoading, setDocumentUploadLoading] = useState(false);
-  const [uploadedDocumentName, setUploadedDocumentName] = useState("");
-
-  const age = useMemo(() => getAgeFromDob(form.dob), [form.dob]);
-
-  const isIdentityLast4Required = useMemo(
-    () => form.identityType !== "other",
-    [form.identityType],
-  );
-
-  const ageEligibilityText = useMemo(() => {
-    if (!form.dob || age === null) {
-      return {
-        className: "register-age-status register-age-status--warn",
-        text: "Add date of birth to check age eligibility.",
-      };
-    }
-
-    if (age >= 18) {
-      return {
-        className: "register-age-status register-age-status--ok",
-        text: `Age eligibility check passed: ${age} years`,
-      };
-    }
-
+  if (!user?.mobileVerified) {
     return {
-      className: "register-age-status register-age-status--warn",
-      text: `Age eligibility check failed: ${age} years`,
+      canVote: false,
+      tone: "warning",
+      title: "Mobile verification pending",
+      message: "Verify your mobile number before voting access is enabled.",
     };
-  }, [age, form.dob]);
+  }
 
-  const handleChange = (event) => {
-    const { name, value } = event.target;
+  if (!user?.ageVerified) {
+    return {
+      canVote: false,
+      tone: "warning",
+      title: "Age verification pending",
+      message: "Your age verification is still waiting for approval.",
+    };
+  }
 
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  if (!user?.isEligibleToVote) {
+    return {
+      canVote: false,
+      tone: "danger",
+      title: "Voting access restricted",
+      message: "Your account is not currently eligible to cast votes.",
+    };
+  }
 
-    setErrors((prev) => ({
-      ...prev,
-      [name]: "",
-    }));
+  if (verificationStatus !== "approved") {
+    return {
+      canVote: false,
+      tone: verificationStatus === "rejected" ? "danger" : "warning",
+      title:
+        verificationStatus === "rejected"
+          ? "Verification rejected"
+          : "Admin approval pending",
+      message:
+        verificationStatus === "rejected"
+          ? user?.verificationRejectionReason ||
+            "Your voter verification was rejected by the administrator."
+          : "Admin approval is still required before you can vote.",
+    };
+  }
+
+  return {
+    canVote: true,
+    tone: "success",
+    title: "Ready to vote",
+    message:
+      "Your account is verified. You can vote when an election becomes active.",
   };
+}
 
-  const validate = () => {
-    const nextErrors = {};
+function MetricCard({ icon: Icon, label, value, helper, color = "mint" }) {
+  return (
+    <article
+      className={`voter-clean-card voter-metric-card voter-metric-card--${color}`}
+    >
+      <div className="voter-metric-card__icon">
+        <Icon size={18} />
+      </div>
 
-    if (form.fullName.trim().length < 3) {
-      nextErrors.fullName = "Full name must be at least 3 characters.";
-    }
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        {helper ? <p>{helper}</p> : null}
+      </div>
+    </article>
+  );
+}
 
-    if (!/\S+@\S+\.\S+/.test(form.email.trim())) {
-      nextErrors.email = "A valid email address is required.";
-    }
+function CheckRow({ label, passed }) {
+  return (
+    <div className="voter-check-row voter-check-row--light">
+      <span>{label}</span>
+      <strong className={passed ? "text-success" : "text-warning"}>
+        {passed ? "Completed" : "Pending"}
+      </strong>
+    </div>
+  );
+}
 
-    if (!/^[6-9]\d{9}$/.test(form.mobileNumber.trim())) {
-      nextErrors.mobileNumber = "Enter a valid 10-digit Indian mobile number.";
-    }
-
-    if (
-      !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_\-+={[}\]|\\:;"'<>,.?/~`]).{8,64}$/.test(
-        form.password,
-      )
-    ) {
-      nextErrors.password =
-        "Use at least 8 characters with uppercase, lowercase, number, and special character.";
-    }
-
-    if (!/^\d{4,6}$/.test(form.otp.trim())) {
-      nextErrors.otp = "OTP must contain 4 to 6 digits.";
-    }
-
-    if (!form.dob) {
-      nextErrors.dob = "Date of birth is required.";
-    }
-
-    if (age !== null && age < 18) {
-      nextErrors.dob = "You must be at least 18 years old to register.";
-    }
-
-    if (isIdentityLast4Required && !/^\d{4}$/.test(form.identityLast4.trim())) {
-      nextErrors.identityLast4 =
-        "Identity last 4 must contain exactly 4 digits.";
-    }
-
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
-  };
-
-  const handleSendOtp = async () => {
-    const mobileNumber = form.mobileNumber.trim();
-    const email = form.email.trim();
-
-    const nextErrors = {};
-
-    if (!/^[6-9]\d{9}$/.test(mobileNumber)) {
-      nextErrors.mobileNumber = "Enter a valid mobile number first.";
-    }
-
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      nextErrors.email = "Enter a valid email address first.";
-    }
-
-    if (Object.keys(nextErrors).length) {
-      setErrors((prev) => ({ ...prev, ...nextErrors }));
-      return;
-    }
-
-    try {
-      setOtpLoading(true);
-
-      await authService.sendOtp({
-        mobileNumber,
-        purpose: "register",
-      });
-
-      setOtpSent(true);
-      toast.success("OTP sent successfully.");
-    } catch (error) {
-      toast.error(getApiErrorMessage(error));
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const handlePickDocument = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleRemoveUploadedDocument = () => {
-    setForm((prev) => ({
-      ...prev,
-      documentUrl: "",
-      documentPublicId: "",
-    }));
-    setUploadedDocumentName("");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const handleDocumentChange = async (event) => {
-    const file = event.target.files?.[0];
-
-    if (!file) {
-      return;
-    }
-
-    const allowedMimeTypes = [
-      "application/pdf",
-      "image/png",
-      "image/jpeg",
-      "image/jpg",
-      "image/webp",
-    ];
-
-    if (!allowedMimeTypes.includes(file.type)) {
-      toast.error("Only PDF, PNG, JPG, JPEG, and WEBP files are allowed.");
-      event.target.value = "";
-      return;
-    }
-
-    const maxSizeBytes = 5 * 1024 * 1024;
-
-    if (file.size > maxSizeBytes) {
-      toast.error("File size must be less than 5 MB.");
-      event.target.value = "";
-      return;
-    }
-
-    try {
-      setDocumentUploadLoading(true);
-
-      const uploaded = await uploadService.uploadVoterDocument(
-        file,
-        form.documentPublicId,
-      );
-
-      setForm((prev) => ({
-        ...prev,
-        documentUrl: uploaded?.fileUrl || "",
-        documentPublicId: uploaded?.publicId || "",
-      }));
-
-      setUploadedDocumentName(file.name);
-      toast.success("Document uploaded successfully.");
-    } catch (error) {
-      toast.error(getApiErrorMessage(error));
-      event.target.value = "";
-    } finally {
-      setDocumentUploadLoading(false);
-    }
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-
-    if (!validate()) {
-      return;
-    }
-
-    try {
-      const payload = {
-        fullName: form.fullName.trim(),
-        email: form.email.trim(),
-        mobileNumber: form.mobileNumber.trim(),
-        password: form.password,
-        otp: form.otp.trim(),
-        dob: form.dob,
-        identityType: form.identityType,
-        identityLast4:
-          form.identityType === "other" ? "" : form.identityLast4.trim(),
-        documentUrl: form.documentUrl,
-        documentPublicId: form.documentPublicId,
-      };
-
-      const data = await register(payload);
-
-      toast.success(
-        data?.isAdult
-          ? "Registration completed successfully. Please wait for admin verification."
-          : "Registration submitted, but age eligibility requirements were not met.",
-      );
-
-      setForm(initialForm);
-      setErrors({});
-      setOtpSent(false);
-      setUploadedDocumentName("");
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    } catch (error) {
-      toast.error(getApiErrorMessage(error));
-    }
-  };
+function ElectionMiniCard({ election, mode = "active" }) {
+  const isUpcoming = election?.status === "upcoming";
 
   return (
-    <AuthLayout
-      title="Create voter account"
-      subtitle="Register with verified personal details to request access to the voting platform."
-      badge="OTP Verified Registration"
-    >
-      <form onSubmit={handleSubmit} className="register-form">
-        <div className="register-meta-strip">
-          <div className="register-meta-pill">
-            <span>Verification</span>
-            <strong>Mobile OTP required</strong>
-          </div>
+    <article className="voter-election-mini-card">
+      <span className={isUpcoming ? "status-chip status-chip--amber" : ""}>
+        {isUpcoming ? "Upcoming" : "Active"}
+      </span>
 
-          <div className="register-meta-pill">
-            <span>Approval workflow</span>
-            <strong>Admin review after registration</strong>
-          </div>
+      <h4>{election?.title || "Election"}</h4>
 
-          <div className="register-meta-pill">
-            <span>Document support</span>
-            <strong>Optional upload available</strong>
-          </div>
+      <p>{election?.description || "No description added."}</p>
+
+      <div>
+        {isUpcoming ? <TimerReset size={15} /> : <Clock3 size={15} />}
+        {isUpcoming
+          ? `Starts: ${formatDate(election?.startDate)}`
+          : `Ends: ${formatDate(election?.endDate)}`}
+      </div>
+
+      {isUpcoming ? (
+        <small className="voter-dashboard-note">
+          Preview posts and candidates now. Voting opens on start date.
+        </small>
+      ) : null}
+
+      <Link to={buildVoterElectionDetailsRoute(election._id)}>
+        {mode === "upcoming" ? "Preview election" : "Open ballot"}
+      </Link>
+    </article>
+  );
+}
+
+export default function VoterDashboardPage() {
+  const { user } = useAuth();
+
+  const [activeTab, setActiveTab] = useState("overview");
+  const [loading, setLoading] = useState(true);
+  const [elections, setElections] = useState([]);
+  const [votes, setVotes] = useState([]);
+
+  useEffect(() => {
+    const loadDashboard = async () => {
+      try {
+        setLoading(true);
+
+        const [electionData, votesData] = await Promise.all([
+          voterService.getPublishedElections(),
+          voteService.getMyVotes({ page: 1, limit: VOTES_PAGE_LIMIT }),
+        ]);
+
+        setElections(
+          Array.isArray(electionData?.elections) ? electionData.elections : [],
+        );
+
+        setVotes(Array.isArray(votesData?.items) ? votesData.items : []);
+      } catch (error) {
+        toast.error(getApiErrorMessage(error));
+        setElections([]);
+        setVotes([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboard();
+  }, []);
+
+  const readiness = useMemo(() => getReadiness(user), [user]);
+
+  const upcomingElections = useMemo(() => {
+    return elections
+      .filter((election) => election?.status === "upcoming")
+      .sort(
+        (a, b) =>
+          new Date(a?.startDate || 0).getTime() -
+          new Date(b?.startDate || 0).getTime(),
+      );
+  }, [elections]);
+
+  const activeElections = useMemo(() => {
+    return elections
+      .filter((election) => election?.status === "active")
+      .sort(
+        (a, b) =>
+          new Date(a?.endDate || 0).getTime() -
+          new Date(b?.endDate || 0).getTime(),
+      );
+  }, [elections]);
+
+  const recentVotes = useMemo(() => {
+    return [...votes]
+      .sort(
+        (a, b) =>
+          new Date(b?.createdAt || 0).getTime() -
+          new Date(a?.createdAt || 0).getTime(),
+      )
+      .slice(0, 3);
+  }, [votes]);
+
+  const nearestUpcomingElection = upcomingElections[0] || null;
+  const nearestActiveElection = activeElections[0] || null;
+
+  const readinessChecks = useMemo(
+    () => [
+      { label: "Mobile verified", passed: Boolean(user?.mobileVerified) },
+      { label: "Age verified", passed: Boolean(user?.ageVerified) },
+      { label: "Eligible to vote", passed: Boolean(user?.isEligibleToVote) },
+      {
+        label: "Admin approved",
+        passed:
+          String(user?.verificationStatus || "pending").toLowerCase() ===
+          "approved",
+      },
+    ],
+    [
+      user?.ageVerified,
+      user?.isEligibleToVote,
+      user?.mobileVerified,
+      user?.verificationStatus,
+    ],
+  );
+
+  return (
+    <section className="voter-page voter-page--dashboard">
+      <section className="voter-page-hero voter-page-hero--peach">
+        <div>
+          <span className="voter-eyebrow">Voter workspace</span>
+          <h2>Hello, {user?.fullName?.split(" ")?.[0] || "Voter"}</h2>
+          <p>
+            Track upcoming elections, active ballots, your voting readiness, and
+            latest vote records from one clean dashboard.
+          </p>
         </div>
 
-        <section className="register-section">
-          <div className="register-section__header">
-            <div className="register-section__title-wrap">
-              <p className="register-section__eyebrow">Step 1</p>
-              <h3 className="register-section__title">Identity details</h3>
-              <p className="register-section__description">
-                Provide accurate personal information to avoid delays during
-                account verification.
-              </p>
-            </div>
+        <div
+          className={`voter-readiness-pill voter-readiness-pill--${readiness.tone}`}
+        >
+          {readiness.canVote ? (
+            <ShieldCheck size={18} />
+          ) : (
+            <ShieldAlert size={18} />
+          )}
 
-            <div className="register-section__icon">
-              <UserPlus size={18} />
-            </div>
+          <div>
+            <strong>{readiness.title}</strong>
+            <span>{readiness.message}</span>
           </div>
+        </div>
+      </section>
 
-          <div className="register-grid">
-            <InputField
-              label="Full Name"
-              name="fullName"
-              placeholder="Enter full name"
-              value={form.fullName}
-              onChange={handleChange}
-              error={errors.fullName}
-            />
+      <div
+        className="voter-option-tabs"
+        role="tablist"
+        aria-label="Dashboard options"
+      >
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={activeTab === tab.id ? "is-active" : ""}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-            <InputField
-              label="Email"
-              name="email"
-              type="email"
-              placeholder="Enter email"
-              value={form.email}
-              onChange={handleChange}
-              error={errors.email}
-            />
-
-            <InputField
-              label="Mobile Number"
-              name="mobileNumber"
-              placeholder="10-digit mobile number"
-              value={form.mobileNumber}
-              onChange={handleChange}
-              error={errors.mobileNumber}
-            />
-
-            <InputField
-              label="Password"
-              name="password"
-              type="password"
-              placeholder="Create a strong password"
-              value={form.password}
-              onChange={handleChange}
-              error={errors.password}
-              hint="Use uppercase, lowercase, number, and special character."
-            />
-
-            <InputField
-              label="Date of Birth"
-              name="dob"
-              type="date"
-              value={form.dob}
-              onChange={handleChange}
-              error={errors.dob}
-            />
-
-            <div className="form-field">
-              <label className="form-label">Identity Type</label>
-              <select
-                className="register-select"
-                name="identityType"
-                value={form.identityType}
-                onChange={handleChange}
-              >
-                {identityTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <InputField
-              className="register-grid__full"
-              label="Identity Last 4"
-              name="identityLast4"
-              placeholder="Enter last 4 digits"
-              value={form.identityLast4}
-              onChange={handleChange}
-              error={errors.identityLast4}
-              hint={
-                isIdentityLast4Required
-                  ? "Required for the selected identity type."
-                  : "Optional when identity type is set to Other."
+      {activeTab === "overview" && (
+        <div className="voter-tab-panel">
+          <div className="voter-metric-grid">
+            <MetricCard
+              icon={TimerReset}
+              label="Upcoming elections"
+              value={loading ? "..." : upcomingElections.length}
+              helper={
+                nearestUpcomingElection
+                  ? `Next starts: ${formatDate(nearestUpcomingElection.startDate)}`
+                  : "No upcoming election found."
               }
+              color="amber"
+            />
+
+            <MetricCard
+              icon={Vote}
+              label="Active elections"
+              value={loading ? "..." : activeElections.length}
+              helper={
+                nearestActiveElection
+                  ? `Nearest deadline: ${formatDate(nearestActiveElection.endDate)}`
+                  : "No active election right now."
+              }
+              color="mint"
+            />
+
+            <MetricCard
+              icon={CheckCircle2}
+              label="Votes on this page"
+              value={loading ? "..." : votes.length}
+              helper={`Latest ${VOTES_PAGE_LIMIT} vote records loaded.`}
+              color="violet"
             />
           </div>
 
-          <div className={ageEligibilityText.className}>
-            <CalendarClock size={16} />
-            <span>{ageEligibilityText.text}</span>
-          </div>
-        </section>
-
-        <section className="register-section">
-          <div className="register-section__header">
-            <div className="register-section__title-wrap">
-              <p className="register-section__eyebrow">Step 2</p>
-              <h3 className="register-section__title">Supporting document</h3>
-              <p className="register-section__description">
-                You may upload a document to support your verification request
-                and reduce manual follow-up.
-              </p>
-            </div>
-
-            <div className="register-section__icon">
-              <FileText size={18} />
-            </div>
-          </div>
-
-          <div className="register-upload">
-            <div className="register-upload__box">
-              <div className="register-upload__content">
-                <div className="register-upload__icon">
-                  <Upload size={18} />
+          <div className="voter-two-column">
+            <section className="voter-clean-card">
+              <div className="voter-card-header">
+                <div>
+                  <h3>Upcoming elections</h3>
+                  <p>Know what is coming before voting starts.</p>
                 </div>
 
+                <Link to={APP_ROUTES.VOTER_ELECTIONS}>View all</Link>
+              </div>
+
+              {loading ? (
+                <div className="voter-empty-box">
+                  Loading upcoming elections...
+                </div>
+              ) : upcomingElections.length ? (
+                <div className="voter-election-mini-grid">
+                  {upcomingElections.slice(0, 2).map((election) => (
+                    <ElectionMiniCard
+                      key={election._id}
+                      election={election}
+                      mode="upcoming"
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="voter-empty-box">
+                  No upcoming elections available.
+                </div>
+              )}
+            </section>
+
+            <section className="voter-clean-card voter-profile-summary-card">
+              <div className="voter-profile-summary-card__avatar voter-profile-summary-card__avatar--photo">
+                {user?.profilePhotoUrl ? (
+                  <img
+                    src={user.profilePhotoUrl}
+                    alt={user?.fullName || "Voter"}
+                  />
+                ) : (
+                  <UserCircle2 size={30} />
+                )}
+              </div>
+
+              <h3>{user?.fullName || "Voter"}</h3>
+              <p>{user?.email || "No email available"}</p>
+
+              <div className="voter-profile-summary-card__meta">
+                <span>{user?.mobileNumber || "No mobile"}</span>
+                <span>{formatStatus(user?.verificationStatus)}</span>
+              </div>
+
+              <Link
+                className="voter-clean-button voter-clean-button--full"
+                to={APP_ROUTES.VOTER_PROFILE}
+              >
+                Open profile
+              </Link>
+            </section>
+          </div>
+
+          <section className="voter-clean-card">
+            <div className="voter-card-header">
+              <div>
+                <h3>Recent votes</h3>
+                <p>Latest vote records from your account.</p>
+              </div>
+
+              <Link to={APP_ROUTES.VOTER_MY_VOTES}>View all</Link>
+            </div>
+
+            {loading ? (
+              <div className="voter-empty-box">Loading vote activity...</div>
+            ) : recentVotes.length ? (
+              <div className="voter-compact-list">
+                {recentVotes.map((vote) => (
+                  <article key={vote._id} className="voter-compact-item">
+                    <div className="voter-compact-item__icon">
+                      <CheckCircle2 size={16} />
+                    </div>
+
+                    <div>
+                      <h4>{vote?.candidateId?.fullName || "Candidate"}</h4>
+                      <p>
+                        {vote?.postId?.title || "Post"} •{" "}
+                        {vote?.electionId?.title || "Election"}
+                      </p>
+                    </div>
+
+                    <span>{formatDate(vote?.createdAt)}</span>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="voter-empty-box">
+                No vote has been recorded yet.
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {activeTab === "upcoming" && (
+        <div className="voter-tab-panel">
+          <section className="voter-clean-card">
+            <div className="voter-card-header">
+              <div>
+                <h3>Upcoming elections</h3>
+                <p>
+                  These elections are published but not started yet. You can
+                  preview posts and candidates.
+                </p>
+              </div>
+
+              <Link to={APP_ROUTES.VOTER_ELECTIONS}>Open election page</Link>
+            </div>
+
+            {loading ? (
+              <div className="voter-empty-box">
+                Loading upcoming elections...
+              </div>
+            ) : upcomingElections.length ? (
+              <div className="voter-election-mini-grid">
+                {upcomingElections.slice(0, 4).map((election) => (
+                  <ElectionMiniCard
+                    key={election._id}
+                    election={election}
+                    mode="upcoming"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="voter-empty-box">
+                No upcoming elections available.
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {activeTab === "active" && (
+        <div className="voter-tab-panel">
+          <section className="voter-clean-card">
+            <div className="voter-card-header">
+              <div>
+                <h3>Active elections</h3>
+                <p>These elections are currently open for voting.</p>
+              </div>
+
+              <Link to={APP_ROUTES.VOTER_ELECTIONS}>Open election page</Link>
+            </div>
+
+            {loading ? (
+              <div className="voter-empty-box">Loading active elections...</div>
+            ) : activeElections.length ? (
+              <div className="voter-election-mini-grid">
+                {activeElections.slice(0, 4).map((election) => (
+                  <ElectionMiniCard
+                    key={election._id}
+                    election={election}
+                    mode="active"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="voter-empty-box">
+                No active election right now.
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {activeTab === "readiness" && (
+        <div className="voter-tab-panel">
+          <div className="voter-two-column">
+            <section className="voter-clean-card">
+              <div className="voter-card-header">
                 <div>
-                  <h4>Upload identity or supporting document</h4>
+                  <h3>Readiness checklist</h3>
                   <p>
-                    Accepted formats: PDF, PNG, JPG, JPEG, WEBP. Maximum size: 5
-                    MB.
+                    These checks decide whether backend will allow voting during
+                    active elections.
                   </p>
                 </div>
               </div>
 
-              <div className="register-upload__actions">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="register-upload__hidden-input"
-                  accept=".pdf,.png,.jpg,.jpeg,.webp"
-                  onChange={handleDocumentChange}
-                />
-
-                <Button
-                  type="button"
-                  variant="secondary"
-                  loading={documentUploadLoading}
-                  onClick={handlePickDocument}
-                >
-                  {form.documentUrl ? "Replace file" : "Choose file"}
-                </Button>
+              <div className="voter-check-list">
+                {readinessChecks.map((check) => (
+                  <CheckRow
+                    key={check.label}
+                    label={check.label}
+                    passed={check.passed}
+                  />
+                ))}
               </div>
-            </div>
+            </section>
 
-            {form.documentUrl ? (
-              <div className="register-upload__summary">
-                <div className="register-upload__summary-left">
-                  <div className="register-upload__summary-icon">
-                    <CheckCircle2 size={18} />
-                  </div>
+            <section className="voter-clean-card voter-info-note-card">
+              <FileBadge2 size={24} />
+              <h3>Account status</h3>
+              <p>{readiness.message}</p>
 
-                  <div>
-                    <h5>Document uploaded</h5>
-                    <p>{uploadedDocumentName || "Uploaded file attached"}</p>
-                  </div>
-                </div>
+              <div className="voter-status-grid-light">
+                <span>Role</span>
+                <strong>{formatStatus(user?.role || "voter")}</strong>
 
-                <div className="register-upload__actions">
-                  <a
-                    href={form.documentUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="register-upload__summary-link"
-                  >
-                    Open file
-                  </a>
+                <span>Voter ID</span>
+                <strong>{user?.internalVoterId || "Not assigned"}</strong>
 
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleRemoveUploadedDocument}
-                  >
-                    <Trash2 size={16} />
-                    Remove
-                  </Button>
-                </div>
+                <span>Approval</span>
+                <strong>{formatStatus(user?.verificationStatus)}</strong>
               </div>
-            ) : null}
+            </section>
           </div>
-
-          <div className="register-helper">
-            <Info size={16} />
-            <p>
-              Document upload is optional, but it can help accelerate the manual
-              verification process.
-            </p>
-          </div>
-        </section>
-
-        <section className="register-section">
-          <div className="register-section__header">
-            <div className="register-section__title-wrap">
-              <p className="register-section__eyebrow">Step 3</p>
-              <h3 className="register-section__title">OTP verification</h3>
-              <p className="register-section__description">
-                Request the OTP first, then enter the code exactly as received
-                to complete registration.
-              </p>
-            </div>
-
-            <div className="register-section__icon">
-              <ShieldCheck size={18} />
-            </div>
-          </div>
-
-          <div className="register-otp-row">
-            <InputField
-              label="OTP"
-              name="otp"
-              placeholder="Enter OTP"
-              value={form.otp}
-              onChange={handleChange}
-              error={errors.otp}
-            />
-
-            <Button
-              type="button"
-              variant="secondary"
-              loading={otpLoading}
-              onClick={handleSendOtp}
-            >
-              {otpSent ? "Resend OTP" : "Send OTP"}
-            </Button>
-          </div>
-        </section>
-
-        <div className="register-submit-wrap">
-          <Button type="submit" loading={isAuthActionLoading}>
-            Complete Registration
-          </Button>
-
-          <p className="register-footer-note">
-            After registration, your account may remain restricted until the
-            admin verification process is completed.
-          </p>
-
-          <p className="auth-footer-text">
-            Already have an account? <Link to={APP_ROUTES.LOGIN}>Sign in</Link>
-          </p>
         </div>
-      </form>
-    </AuthLayout>
+      )}
+    </section>
   );
 }

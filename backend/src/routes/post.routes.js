@@ -8,7 +8,7 @@ import {
   getPostById,
   updatePost,
   deletePost,
-  getActivePostsWithCandidatesForElection,
+  getVisiblePostsWithCandidatesForVoter,
 } from "../controllers/post.controller.js";
 import {
   createPostSchema,
@@ -16,7 +16,7 @@ import {
   getPostByIdSchema,
   updatePostSchema,
   deletePostSchema,
-  getActivePostsWithCandidatesForElectionSchema,
+  getVisiblePostsWithCandidatesForVoterSchema,
 } from "../validations/post.validation.js";
 
 const router = express.Router();
@@ -35,6 +35,14 @@ router.get(
   authorizeRoles("admin", "super_admin"),
   validate(getPostsByElectionSchema),
   getPostsByElection,
+);
+
+router.get(
+  "/voter/election/:electionId",
+  verifyJWT,
+  authorizeRoles("voter"),
+  validate(getVisiblePostsWithCandidatesForVoterSchema),
+  getVisiblePostsWithCandidatesForVoter,
 );
 
 router.get(
@@ -59,14 +67,6 @@ router.delete(
   authorizeRoles("admin", "super_admin"),
   validate(deletePostSchema),
   deletePost,
-);
-
-router.get(
-  "/voter/election/:electionId",
-  verifyJWT,
-  authorizeRoles("voter"),
-  validate(getActivePostsWithCandidatesForElectionSchema),
-  getActivePostsWithCandidatesForElection,
 );
 
 export default router;

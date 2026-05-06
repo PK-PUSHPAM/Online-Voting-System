@@ -6,6 +6,7 @@ import {
   ALLOWED_DOCUMENT_MIME_TYPES,
   ALLOWED_IMAGE_MIME_TYPES,
   MAX_CANDIDATE_PHOTO_SIZE,
+  MAX_PROFILE_PHOTO_SIZE,
   MAX_VOTER_DOCUMENT_SIZE,
 } from "../constants/upload.constants.js";
 
@@ -117,6 +118,15 @@ export const uploadCandidatePhoto = handleMulterError(
     fileLabel: "candidate photo",
   }).single("candidatePhoto"),
   MAX_CANDIDATE_PHOTO_SIZE,
+);
+
+export const uploadProfilePhoto = handleMulterError(
+  createUploader({
+    allowedMimeTypes: ALLOWED_IMAGE_MIME_TYPES,
+    maxFileSize: MAX_PROFILE_PHOTO_SIZE,
+    fileLabel: "profile photo",
+  }).single("profilePhoto"),
+  MAX_PROFILE_PHOTO_SIZE,
 );
 
 export const uploadVoterDocument = handleMulterError(

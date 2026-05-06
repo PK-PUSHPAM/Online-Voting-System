@@ -365,6 +365,19 @@ export const deleteElection = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Election deleted successfully"));
 });
 
+const canVoterSeeElection = ({ election, voter }) => {
+  if (!election?.isPublished) return false;
+
+  if (
+    election.allowedVoterType === "verifiedOnly" &&
+    voter.verificationStatus !== "approved"
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
 export const getActivePublishedElectionsForVoter = asyncHandler(
   async (req, res) => {
     const voter = req.user;
@@ -373,7 +386,7 @@ export const getActivePublishedElectionsForVoter = asyncHandler(
       isPublished: true,
     })
       .populate("createdBy", "fullName email role")
-      .sort({ createdAt: -1 });
+      .sort({ startDate: 1 });
 
     const syncedElections = await Promise.all(
       elections.map(async (election) => syncElectionStatus(election)),
@@ -382,14 +395,10 @@ export const getActivePublishedElectionsForVoter = asyncHandler(
     const activeElections = syncedElections.filter((election) => {
       if (election.status !== "active") return false;
 
-      if (
-        election.allowedVoterType === "verifiedOnly" &&
-        voter.verificationStatus !== "approved"
-      ) {
-        return false;
-      }
-
-      return true;
+      return canVoterSeeElection({
+        election,
+        voter,
+      });
     });
 
     return res.status(200).json(
@@ -404,3 +413,50 @@ export const getActivePublishedElectionsForVoter = asyncHandler(
     );
   },
 );
+
+export const getPublishedElectionsForVoter = asyncHandler(async (req, res) => {
+  const voter = req.user;
+
+  const elections = await Election.find({
+    isPublished: true,
+    status: { $in: ["upcoming", "active"] },
+  })
+    .populate("createdBy", "fullName email role")
+    .sort({ startDate: 1 });
+
+  const syncedElections = await Promise.all(
+    elections.map(async (election) => syncElectionStatus(election)),
+  );
+
+  const visibleElections = syncedElections.filter((election) => {
+    if (!["upcoming", "active"].includes(election.status)) return false;
+
+    return canVoterSeeElection({
+      election,
+      voter,
+    });
+  });
+
+  const upcomingElections = visibleElections.filter(
+    (election) => election.status === "upcoming",
+  );
+
+  const activeElections = visibleElections.filter(
+    (election) => election.status === "active",
+  );
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        count: visibleElections.length,
+        elections: visibleElections,
+        upcomingCount: upcomingElections.length,
+        activeCount: activeElections.length,
+        upcomingElections,
+        activeElections,
+      },
+      "Published elections fetched successfully",
+    ),
+  );
+});

@@ -44,3 +44,33 @@ export const approveRejectVoterSchema = z.object({
   }),
   query: emptyObjectSchema,
 });
+
+export const updateMyProfileSchema = z.object({
+  body: z
+    .object({
+      fullName: z
+        .string()
+        .trim()
+        .min(3, "Full name must be at least 3 characters")
+        .max(80, "Full name must not exceed 80 characters")
+        .optional(),
+
+      identityType: z
+        .enum(["voterId", "collegeId", "aadhaarLast4", "other"])
+        .optional(),
+
+      identityLast4: z
+        .string()
+        .trim()
+        .regex(
+          /^[0-9A-Za-z]{0,4}$/,
+          "Identity last 4 must be up to 4 letters or numbers",
+        )
+        .optional(),
+    })
+    .refine((data) => Object.keys(data).length > 0, {
+      message: "At least one field is required for update",
+    }),
+  params: emptyObjectSchema,
+  query: emptyObjectSchema,
+});

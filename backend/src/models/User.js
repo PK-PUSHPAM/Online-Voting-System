@@ -114,6 +114,18 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
+    profilePhotoUrl: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    profilePhotoPublicId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     verifiedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

@@ -14,6 +14,8 @@ import candidateRoutes from "./routes/candidate.routes.js";
 import voteRoutes from "./routes/vote.routes.js";
 import resultRoutes from "./routes/result.routes.js";
 import uploadRoutes from "./routes/upload.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
+import publicChatRoutes from "./routes/publicChat.routes.js";
 
 import notFoundHandler from "./middleware/notFound.middleware.js";
 import errorHandler from "./middleware/error.middleware.js";
@@ -133,6 +135,8 @@ app.use("/api/v1/candidates", candidateRoutes);
 app.use("/api/v1/votes", voteRoutes);
 app.use("/api/v1/results", resultRoutes);
 app.use("/api/v1/uploads", uploadRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/chat", publicChatRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

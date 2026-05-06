@@ -59,3 +59,9 @@ export const getActivePublishedElectionsForVoterSchema = z.object({
   params: emptyObjectSchema,
   query: emptyObjectSchema,
 });
+
+export const getPublishedElectionsForVoterSchema = z.object({
+  body: emptyObjectSchema,
+  params: emptyObjectSchema,
+  query: emptyObjectSchema,
+});

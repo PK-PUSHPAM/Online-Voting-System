@@ -6,6 +6,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import getElectionStatus from "../utils/getElectionStatus.js";
+import syncElectionStatus from "../utils/syncElectionStatus.js";
 import { buildPagination } from "../utils/pagination.util.js";
 import { buildPaginationResponse } from "../utils/paginationResponse.util.js";
 
@@ -26,13 +27,37 @@ const ensureUpcomingElection = (election) => {
   return status;
 };
 
+const canVoterAccessElection = ({ election, voter }) => {
+  if (!election) {
+    throw new ApiError(404, "Election not found");
+  }
+
+  if (!election.isPublished) {
+    throw new ApiError(403, "Election is not published for voters");
+  }
+
+  if (!["upcoming", "active"].includes(election.status)) {
+    throw new ApiError(403, "This election is not available for voters");
+  }
+
+  if (
+    election.allowedVoterType === "verifiedOnly" &&
+    voter?.verificationStatus !== "approved"
+  ) {
+    throw new ApiError(
+      403,
+      "Your account is not approved to view this election",
+    );
+  }
+};
+
 export const createPost = asyncHandler(async (req, res) => {
   const { body, params } = req.validatedData || {
     body: req.body,
     params: req.params,
   };
-  const { title, description, maxVotesPerVoter, displayOrder, isActive } = body;
 
+  const { title, description, maxVotesPerVoter, displayOrder, isActive } = body;
   const { electionId } = params;
 
   const election = await Election.findById(electionId);
@@ -96,15 +121,16 @@ export const getPostsByElection = asyncHandler(async (req, res) => {
     limit,
   });
 
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        { items: posts, pagination },
-        "Posts fetched successfully",
-      ),
-    );
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        items: posts,
+        pagination,
+      },
+      "Posts fetched successfully",
+    ),
+  );
 });
 
 export const getPostById = asyncHandler(async (req, res) => {
@@ -218,27 +244,46 @@ export const deletePost = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Post deleted successfully"));
 });
 
-export const getActivePostsWithCandidatesForElection = asyncHandler(
+export const getVisiblePostsWithCandidatesForVoter = asyncHandler(
   async (req, res) => {
     const { params } = req.validatedData || { params: req.params };
     const { electionId } = params;
 
-    const election = await Election.findById(electionId).select("_id");
+    let election = await Election.findById(electionId);
+
     if (!election) {
       throw new ApiError(404, "Election not found");
     }
 
+    election = await syncElectionStatus(election);
+
+    canVoterAccessElection({
+      election,
+      voter: req.user,
+    });
+
     const posts = await Post.find({
       electionId,
       isActive: true,
-    }).sort({ displayOrder: 1 });
+    }).sort({
+      displayOrder: 1,
+      createdAt: 1,
+    });
 
     const postsWithCandidates = await Promise.all(
       posts.map(async (post) => {
         const candidates = await Candidate.find({
+          electionId,
           postId: post._id,
           isActive: true,
-        }).select("-__v");
+          isApproved: true,
+          approvalStatus: "approved",
+        })
+          .select("-__v")
+          .sort({
+            fullName: 1,
+            createdAt: 1,
+          });
 
         return {
           ...post.toObject(),
@@ -247,14 +292,27 @@ export const getActivePostsWithCandidatesForElection = asyncHandler(
       }),
     );
 
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          postsWithCandidates,
-          "Active posts with candidates fetched successfully",
-        ),
-      );
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          election: {
+            _id: election._id,
+            title: election.title,
+            description: election.description,
+            startDate: election.startDate,
+            endDate: election.endDate,
+            status: election.status,
+            isPublished: election.isPublished,
+            allowedVoterType: election.allowedVoterType,
+          },
+          canVoteNow: election.status === "active",
+          posts: postsWithCandidates,
+        },
+        election.status === "active"
+          ? "Active election posts with candidates fetched successfully"
+          : "Upcoming election posts with candidates fetched successfully",
+      ),
+    );
   },
 );
