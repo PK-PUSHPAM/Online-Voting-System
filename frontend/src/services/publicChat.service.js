@@ -27,4 +27,48 @@ export const publicChatService = {
 
     return extractData(response);
   },
+
+  async deleteMessage(messageId, reason = "Removed by administrator") {
+    if (!messageId) return {};
+
+    const response = await apiClient.delete(
+      `/chat/public/messages/${messageId}`,
+      {
+        data: {
+          reason,
+        },
+      },
+    );
+
+    return extractData(response);
+  },
+
+  async blockUser(userId, reason = "Blocked by administrator") {
+    if (!userId) return {};
+
+    const response = await apiClient.patch(`/chat/public/block/${userId}`, {
+      reason,
+    });
+
+    return extractData(response);
+  },
+
+  async unblockUser(userId) {
+    if (!userId) return {};
+
+    const response = await apiClient.patch(`/chat/public/unblock/${userId}`);
+
+    return extractData(response);
+  },
+
+  async getBlockedUsers({ page = 1, limit = 20 } = {}) {
+    const response = await apiClient.get("/chat/public/blocked-users", {
+      params: {
+        page,
+        limit,
+      },
+    });
+
+    return extractData(response);
+  },
 };
