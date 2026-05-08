@@ -17,8 +17,14 @@ import "./styles/voter-clean-pages.css";
 import "./styles/voter-center-polish.css";
 
 // Final safe override for admin/super-admin light UI.
-// Keep this LAST so it overrides old dark admin theme and inline-heavy styles.
 import "./styles/admin-light-theme.css";
+
+// Final admin responsive/spacing polish.
+import "./styles/admin-final-polish.css";
+
+// Final mobile/sidebar hardening.
+// Keep this LAST.
+import "./styles/admin-mobile-hardening.css";
 
 export default function App() {
   return (

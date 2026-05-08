@@ -1,0 +1,1050 @@
+/* =========================================================
+   ADMIN FINAL POLISH OVERRIDES
+   Keep this file imported after admin-light-theme.css
+========================================================= */
+
+/* Global admin safety */
+
+.admin-shell,
+.admin-shell * {
+  box-sizing: border-box;
+}
+
+.admin-shell {
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.admin-shell__main,
+.admin-shell__content {
+  min-width: 0;
+}
+
+.admin-crud,
+.adm-dashboard-page,
+.aep-page,
+.amp-page,
+.acp-page,
+.avp-page,
+.arp-page,
+.amg-page,
+.asc2-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* Better page spacing */
+
+.admin-shell__content {
+  padding-bottom: 36px !important;
+}
+
+.admin-crud {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Topbar final cleanup */
+
+.admin-topbar {
+  min-height: 74px !important;
+  padding: 14px 16px !important;
+  border-radius: 24px !important;
+  align-items: center !important;
+}
+
+.admin-topbar__left {
+  min-width: 0 !important;
+}
+
+.admin-topbar__title-wrap {
+  min-width: 0 !important;
+}
+
+.admin-topbar__title-wrap h1 {
+  max-width: 52vw !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.admin-topbar__right {
+  min-width: 0 !important;
+  gap: 10px !important;
+}
+
+.admin-topbar__profile {
+  min-width: 0 !important;
+  max-width: 240px !important;
+}
+
+.admin-topbar__profile-text {
+  min-width: 0 !important;
+}
+
+.admin-topbar__profile-text strong,
+.admin-topbar__profile-text span {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.admin-topbar__logout-btn,
+.admin-center-button,
+.admin-topbar__ghost-btn {
+  min-height: 42px !important;
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+
+/* Sidebar final cleanup */
+
+.admin-sidebar {
+  overflow: hidden !important;
+}
+
+.admin-sidebar__nav {
+  min-height: 0 !important;
+}
+
+.admin-sidebar__nested-trigger {
+  flex-shrink: 0;
+}
+
+.admin-sidebar__link {
+  flex-shrink: 0;
+}
+
+.admin-sidebar__link-label,
+.admin-sidebar__brand-text strong,
+.admin-sidebar__brand-text span,
+.admin-sidebar__account-copy strong,
+.admin-sidebar__account-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Tabs final polish */
+
+.adm-tabs,
+.asc-tabs {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.adm-tabs button,
+.asc-tabs button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.adm-tabs::-webkit-scrollbar,
+.asc-tabs::-webkit-scrollbar {
+  height: 6px;
+}
+
+.adm-tabs::-webkit-scrollbar-thumb,
+.asc-tabs::-webkit-scrollbar-thumb {
+  background: #d8cbb8;
+  border-radius: 999px;
+}
+
+/* Button consistency */
+
+.adm-primary-btn,
+.adm-secondary-btn,
+.admin-crud__submit,
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.aep-form-actions button,
+.amp-form-actions button,
+.acp-form-actions button,
+.avp-voter-actions button,
+.arp-hero-actions button,
+.amg-form-actions button,
+.asc2-hero-actions button {
+  min-height: 42px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  white-space: nowrap !important;
+  text-decoration: none !important;
+  line-height: 1 !important;
+}
+
+.adm-primary-btn:disabled,
+.adm-secondary-btn:disabled,
+.admin-crud__submit:disabled,
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-danger:disabled {
+  opacity: 0.58 !important;
+  cursor: not-allowed !important;
+}
+
+/* Form controls consistency */
+
+.form-field,
+.form-input,
+.admin-crud__select,
+.admin-crud__textarea {
+  min-width: 0 !important;
+}
+
+.form-label {
+  color: #5f6670 !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+}
+
+.form-input,
+.admin-crud__select {
+  min-height: 46px !important;
+}
+
+.admin-crud__textarea {
+  min-height: 110px !important;
+  resize: vertical !important;
+  line-height: 1.5 !important;
+}
+
+.form-input,
+.admin-crud__select,
+.admin-crud__textarea,
+.aep-search-box,
+.aep-filter-select,
+.amp-search-box,
+.amp-filter-select,
+.acp-search-box,
+.acp-filter-select,
+.avp-search-box,
+.avp-filter-select,
+.amg-search-box,
+.amg-filter-select,
+.asc2-search-box,
+.arp-context-card select,
+.acp-context-grid select {
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease !important;
+}
+
+.form-input:focus,
+.admin-crud__select:focus,
+.admin-crud__textarea:focus,
+.aep-search-box:focus-within,
+.aep-filter-select:focus-within,
+.amp-search-box:focus-within,
+.amp-filter-select:focus-within,
+.acp-search-box:focus-within,
+.acp-filter-select:focus-within,
+.avp-search-box:focus-within,
+.avp-filter-select:focus-within,
+.amg-search-box:focus-within,
+.amg-filter-select:focus-within,
+.asc2-search-box:focus-within,
+.arp-context-card select:focus,
+.acp-context-grid select:focus {
+  background: #ffffff !important;
+  border-color: #bce7cb !important;
+  box-shadow: 0 0 0 4px rgba(36, 122, 82, 0.1) !important;
+}
+
+/* Hero cards equal rhythm */
+
+.adm-dashboard-hero,
+.aep-hero,
+.amp-hero,
+.acp-hero,
+.avp-hero,
+.arp-hero,
+.amg-hero,
+.asc2-hero {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.adm-dashboard-hero h2,
+.aep-hero h2,
+.amp-hero h2,
+.acp-hero h2,
+.avp-hero h2,
+.arp-hero h2,
+.amg-hero h2,
+.asc2-hero h2 {
+  text-wrap: balance;
+}
+
+.adm-hero-summary,
+.aep-hero-mini-grid,
+.amp-hero-mini-grid,
+.acp-hero-mini-grid,
+.avp-hero-mini-grid,
+.arp-hero-mini-grid,
+.amg-hero-mini-grid,
+.asc2-hero-mini-grid {
+  min-width: 0;
+}
+
+.adm-hero-summary div,
+.aep-hero-mini-grid div,
+.amp-hero-mini-grid div,
+.acp-hero-mini-grid div,
+.avp-hero-mini-grid div,
+.arp-hero-mini-grid div,
+.amg-hero-mini-grid div,
+.asc2-hero-mini-grid div {
+  min-width: 0;
+}
+
+/* Cards equal height and overflow protection */
+
+.adm-metric-card,
+.aep-metric-card,
+.amp-metric-card,
+.acp-metric-card,
+.avp-metric-card,
+.arp-metric-card,
+.amg-metric-card,
+.asc2-metric-card,
+.adm-panel-card,
+.aep-panel-card,
+.amp-panel-card,
+.acp-panel-card,
+.avp-panel-card,
+.arp-panel-card,
+.amg-panel-card,
+.asc2-panel-card,
+.adm-chart-card,
+.arp-chart-card {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.aep-election-card,
+.amp-post-card,
+.acp-candidate-card,
+.avp-voter-card,
+.arp-post-card,
+.amg-admin-card,
+.asc2-block-card {
+  min-height: 100%;
+  overflow: hidden;
+}
+
+.aep-election-card__top,
+.amp-post-card__top,
+.acp-candidate-card__top,
+.avp-voter-card__top,
+.amg-admin-card__top,
+.asc2-block-card__top {
+  min-width: 0;
+}
+
+.aep-election-card__top h4,
+.amp-post-card__top h4,
+.acp-candidate-card__title h4,
+.avp-voter-title h4,
+.amg-admin-title h4,
+.asc2-block-title h4 {
+  max-width: 100%;
+}
+
+/* Card actions stay inside */
+
+.acp-candidate-card__actions,
+.avp-voter-actions,
+.amg-admin-card__actions,
+.asc2-block-card__actions,
+.aep-form-actions,
+.amp-form-actions,
+.acp-form-actions,
+.avp-hero-actions,
+.arp-hero-actions,
+.amg-form-actions,
+.asc2-hero-actions {
+  min-width: 0;
+}
+
+.acp-candidate-card__actions button,
+.avp-voter-actions button,
+.amg-admin-card__actions button,
+.asc2-block-card__actions button {
+  flex: 0 1 auto;
+}
+
+/* Lists and rows */
+
+.adm-election-row,
+.adm-audit-row,
+.aep-compact-row,
+.amp-compact-row,
+.acp-compact-row,
+.avp-compact-row,
+.amg-compact-row,
+.asc2-compact-row,
+.arp-summary-row,
+.arp-leading-row,
+.arp-candidate-row {
+  min-width: 0;
+}
+
+.adm-election-row__main,
+.arp-summary-row__main,
+.arp-candidate-main {
+  min-width: 0;
+}
+
+/* Status/chip wrapping */
+
+.aep-election-card__chips,
+.amp-post-card__footer,
+.acp-candidate-card__chips,
+.avp-chip-row,
+.amg-chip-row,
+.asc2-chip-row,
+.arp-context-summary {
+  min-width: 0;
+}
+
+.aep-status,
+.aep-id-chip,
+.amp-status,
+.amp-id-chip,
+.acp-status,
+.acp-id-chip,
+.avp-status,
+.avp-chip,
+.amg-status,
+.amg-id-chip,
+.asc2-chip,
+.asc2-status,
+.arp-status,
+.arp-id-chip,
+.arp-panel-badge {
+  max-width: 100%;
+}
+
+/* Chart overflow fixes */
+
+.recharts-wrapper,
+.recharts-surface {
+  max-width: 100% !important;
+}
+
+.adm-chart-box,
+.arp-chart-box {
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.adm-chart-card__body,
+.arp-chart-card__body {
+  overflow: hidden;
+}
+
+/* Dropdown polish */
+
+.admin-center-dropdown {
+  max-width: calc(100vw - 24px) !important;
+}
+
+.admin-center-notification,
+.admin-chat-message,
+.admin-chat-message__bubble {
+  min-width: 0 !important;
+}
+
+.admin-chat-form {
+  min-width: 0 !important;
+}
+
+.admin-chat-form input {
+  min-width: 0 !important;
+}
+
+.admin-chat-form button {
+  flex-shrink: 0 !important;
+}
+
+/* Empty boxes consistent */
+
+.adm-empty-box,
+.aep-empty-box,
+.amp-empty-box,
+.acp-empty-box,
+.avp-empty-box,
+.arp-empty-box,
+.amg-empty-box,
+.asc2-empty-box,
+.asc2-empty-state {
+  color: #6b7280 !important;
+  line-height: 1.55 !important;
+}
+
+/* Pagination consistency */
+
+.aep-pagination,
+.amp-pagination,
+.acp-pagination,
+.avp-pagination,
+.arp-pagination,
+.amg-pagination,
+.asc2-pagination {
+  min-width: 0;
+}
+
+.aep-pagination button,
+.amp-pagination button,
+.acp-pagination button,
+.avp-pagination button,
+.arp-pagination button,
+.amg-pagination button,
+.asc2-pagination button {
+  flex-shrink: 0;
+}
+
+.aep-pagination span,
+.amp-pagination span,
+.acp-pagination span,
+.avp-pagination span,
+.arp-pagination span,
+.amg-pagination span,
+.asc2-pagination span {
+  white-space: nowrap;
+}
+
+/* Mobile tablet */
+
+@media (max-width: 1024px) {
+  .admin-shell__inner {
+    padding: 14px !important;
+  }
+
+  .admin-shell__content {
+    padding-top: 14px !important;
+  }
+
+  .admin-topbar__title-wrap h1 {
+    max-width: 44vw !important;
+  }
+
+  .admin-topbar__profile {
+    max-width: 190px !important;
+  }
+}
+
+/* Mobile */
+
+@media (max-width: 760px) {
+  .admin-shell__inner {
+    padding: 12px !important;
+  }
+
+  .admin-topbar {
+    min-height: 66px !important;
+    padding: 12px !important;
+    border-radius: 20px !important;
+  }
+
+  .admin-topbar__title-wrap h1 {
+    max-width: 48vw !important;
+    font-size: 1.1rem !important;
+  }
+
+  .admin-topbar__eyebrow {
+    font-size: 10px !important;
+  }
+
+  .admin-topbar__profile {
+    max-width: none !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+  }
+
+  .admin-topbar__profile-text {
+    display: none !important;
+  }
+
+  .admin-topbar__logout-btn span,
+  .admin-center-button span {
+    display: none !important;
+  }
+
+  .admin-topbar__logout-btn,
+  .admin-center-button {
+    width: 42px !important;
+    padding: 0 !important;
+  }
+
+  .adm-tabs {
+    flex-wrap: nowrap !important;
+  }
+
+  .adm-tabs button {
+    min-width: max-content !important;
+  }
+
+  .adm-dashboard-hero,
+  .aep-hero,
+  .amp-hero,
+  .acp-hero,
+  .avp-hero,
+  .arp-hero,
+  .amg-hero,
+  .asc2-hero {
+    border-radius: 24px !important;
+  }
+
+  .adm-primary-btn,
+  .adm-secondary-btn,
+  .admin-crud__submit,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger {
+    width: 100%;
+  }
+
+  .aep-filter-bar,
+  .amp-filter-bar,
+  .acp-filter-bar,
+  .avp-filter-bar,
+  .avp-filter-bar--all,
+  .amg-filter-bar,
+  .asc2-filter-bar {
+    grid-template-columns: 1fr !important;
+  }
+
+  .aep-filter-bar button,
+  .amp-filter-bar button,
+  .acp-filter-bar button,
+  .avp-filter-bar button,
+  .amg-filter-bar button,
+  .asc2-filter-bar button {
+    width: 100% !important;
+  }
+
+  .acp-upload-card,
+  .aep-switch-card,
+  .amp-switch-card,
+  .acp-switch-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .acp-upload-card > span.adm-secondary-btn {
+    width: 100%;
+  }
+
+  .admin-center-dropdown {
+    position: fixed !important;
+    top: 74px !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    max-height: calc(100vh - 92px) !important;
+  }
+}
+
+/* Small mobile */
+
+@media (max-width: 520px) {
+  .admin-topbar__title-wrap h1 {
+    max-width: 42vw !important;
+  }
+
+  .admin-topbar__right {
+    gap: 6px !important;
+  }
+
+  .admin-topbar__avatar {
+    width: 38px !important;
+    height: 38px !important;
+  }
+
+  .adm-dashboard-hero,
+  .aep-hero,
+  .amp-hero,
+  .acp-hero,
+  .avp-hero,
+  .arp-hero,
+  .amg-hero,
+  .asc2-hero {
+    padding: 16px !important;
+  }
+
+  .adm-dashboard-hero h2,
+  .aep-hero h2,
+  .amp-hero h2,
+  .acp-hero h2,
+  .avp-hero h2,
+  .arp-hero h2,
+  .amg-hero h2,
+  .asc2-hero h2 {
+    font-size: 1.35rem !important;
+    letter-spacing: -0.025em !important;
+  }
+
+  .adm-metric-card,
+  .aep-metric-card,
+  .amp-metric-card,
+  .acp-metric-card,
+  .avp-metric-card,
+  .arp-metric-card,
+  .amg-metric-card,
+  .asc2-metric-card {
+    min-height: 108px !important;
+    padding: 14px !important;
+  }
+
+  .adm-metric-card strong,
+  .aep-metric-card strong,
+  .amp-metric-card strong,
+  .acp-metric-card strong,
+  .avp-metric-card strong,
+  .arp-metric-card strong,
+  .amg-metric-card strong,
+  .asc2-metric-card strong {
+    font-size: 1.45rem !important;
+  }
+
+  .adm-panel-card,
+  .aep-panel-card,
+  .amp-panel-card,
+  .acp-panel-card,
+  .avp-panel-card,
+  .arp-panel-card,
+  .amg-panel-card,
+  .asc2-panel-card,
+  .adm-chart-card,
+  .arp-chart-card {
+    padding: 14px !important;
+    border-radius: 22px !important;
+  }
+
+  .aep-election-card,
+  .amp-post-card,
+  .acp-candidate-card,
+  .avp-voter-card,
+  .arp-post-card,
+  .amg-admin-card,
+  .asc2-block-card {
+    padding: 14px !important;
+    border-radius: 20px !important;
+  }
+
+  .adm-chart-box--medium,
+  .adm-chart-box--large,
+  .arp-chart-box--medium,
+  .arp-chart-box--large {
+    height: 250px !important;
+  }
+}
+/* =========================================================
+   ADMIN LOGOUT MOVED TO SIDEBAR + MOBILE TOPBAR IMPROVEMENT
+========================================================= */
+
+/* Hide old topbar logout completely */
+.admin-topbar__logout-btn {
+  display: none !important;
+}
+
+/* Sidebar bottom/logout */
+
+.admin-sidebar__bottom {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.admin-sidebar__logout {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 16px;
+  background: #ffe4e9;
+  color: #ba3545;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 950;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.admin-sidebar__logout:hover {
+  transform: translateY(-1px);
+  background: #ffd3dc;
+  box-shadow: 0 12px 24px rgba(186, 53, 69, 0.12);
+}
+
+.admin-sidebar__logout:active {
+  transform: translateY(0);
+}
+
+.admin-sidebar__logout--collapsed {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 16px;
+}
+
+/* Collapsed sidebar bottom alignment */
+.admin-sidebar--collapsed .admin-sidebar__bottom {
+  align-items: center;
+}
+
+.admin-sidebar--collapsed .admin-sidebar__logout {
+  width: 44px;
+  min-width: 44px;
+}
+
+/* Mobile topbar redesign */
+
+@media (max-width: 760px) {
+  .admin-topbar {
+    min-height: 62px !important;
+    padding: 10px 11px !important;
+    border-radius: 18px !important;
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
+    gap: 9px !important;
+  }
+
+  .admin-topbar__left {
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 9px !important;
+  }
+
+  .admin-topbar__menu-btn {
+    width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 !important;
+    border-radius: 14px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .admin-topbar__title-wrap {
+    min-width: 0 !important;
+  }
+
+  .admin-topbar__eyebrow {
+    display: none !important;
+  }
+
+  .admin-topbar__title-wrap h1 {
+    max-width: 100% !important;
+    font-size: 1rem !important;
+    line-height: 1.1 !important;
+    letter-spacing: -0.02em !important;
+  }
+
+  .admin-topbar__right {
+    min-width: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 7px !important;
+  }
+
+  .admin-center-button {
+    width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 !important;
+    border-radius: 14px !important;
+  }
+
+  .admin-center-button span {
+    display: none !important;
+  }
+
+  .admin-topbar__ghost-btn {
+    display: none !important;
+  }
+
+  .admin-topbar__profile {
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+  }
+
+  .admin-topbar__avatar {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 14px !important;
+  }
+
+  .admin-topbar__profile-text {
+    display: none !important;
+  }
+
+  .admin-center-button__badge {
+    top: -3px !important;
+    right: -4px !important;
+  }
+
+  .admin-center-dropdown {
+    top: 68px !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    max-width: none !important;
+    border-radius: 20px !important;
+  }
+
+  .admin-sidebar__bottom {
+    margin-top: 12px;
+  }
+
+  .admin-sidebar__logout {
+    min-height: 46px;
+    border-radius: 17px;
+  }
+}
+
+/* Extra small mobile */
+@media (max-width: 420px) {
+  .admin-topbar {
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
+    gap: 7px !important;
+    padding: 9px !important;
+  }
+
+  .admin-topbar__menu-btn,
+  .admin-center-button,
+  .admin-topbar__profile,
+  .admin-topbar__avatar {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+  }
+
+  .admin-topbar__title-wrap h1 {
+    font-size: 0.95rem !important;
+  }
+}
+/* =========================================================
+   FIX: ADMIN MOBILE TOPBAR BELL ICON VISIBILITY
+========================================================= */
+
+@media (max-width: 760px) {
+  .admin-topbar__right {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 8px !important;
+    min-width: max-content !important;
+    flex-shrink: 0 !important;
+  }
+
+  .admin-center-wrap {
+    display: block !important;
+    position: relative !important;
+    flex-shrink: 0 !important;
+  }
+
+  .admin-center-button {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    max-width: 40px !important;
+    max-height: 40px !important;
+    padding: 0 !important;
+    border-radius: 14px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    position: relative !important;
+    z-index: 5 !important;
+  }
+
+  .admin-center-button svg {
+    display: block !important;
+    width: 18px !important;
+    height: 18px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .admin-center-button span:not(.admin-center-button__badge) {
+    display: none !important;
+  }
+
+  .admin-center-button__badge {
+    display: inline-flex !important;
+    position: absolute !important;
+    top: -4px !important;
+    right: -4px !important;
+    min-width: 18px !important;
+    height: 18px !important;
+    padding: 0 5px !important;
+    border-radius: 999px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 10px !important;
+    font-weight: 950 !important;
+    line-height: 1 !important;
+    z-index: 10 !important;
+  }
+
+  .admin-topbar__profile {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .admin-topbar__avatar {
+    display: grid !important;
+    place-items: center !important;
+    flex-shrink: 0 !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .admin-center-button {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+    max-width: 38px !important;
+    max-height: 38px !important;
+  }
+
+  .admin-center-button svg {
+    width: 17px !important;
+    height: 17px !important;
+  }
+}

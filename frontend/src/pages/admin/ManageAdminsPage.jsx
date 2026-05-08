@@ -1,11 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
-import { Shield, ShieldCheck, UserCog, UserPlus } from "lucide-react";
+import {
+  BadgeCheck,
+  CheckCircle2,
+  Crown,
+  Filter,
+  LayoutGrid,
+  ListChecks,
+  Mail,
+  PlusCircle,
+  RefreshCw,
+  Search,
+  Shield,
+  ShieldCheck,
+  UserCog,
+  UserPlus,
+  Users,
+  XCircle,
+} from "lucide-react";
 import { toast } from "react-hot-toast";
 import Button from "../../components/common/Button";
 import InputField from "../../components/common/InputField";
 import { adminService } from "../../services/admin.service";
 import { getApiErrorMessage } from "../../lib/utils";
 import "../../styles/admin-crud.css";
+import "../../styles/admin-light-theme.css";
+
+const PAGE_LIMIT = 10;
 
 const initialForm = {
   fullName: "",
@@ -16,127 +36,329 @@ const initialForm = {
   role: "admin",
 };
 
-const roleClassMap = {
-  admin: "admin-crud__status admin-crud__status--active",
-  super_admin: "admin-crud__status admin-crud__status--published",
-  superadmin: "admin-crud__status admin-crud__status--published",
-};
+const tabs = [
+  { id: "overview", label: "Overview", icon: LayoutGrid },
+  { id: "create", label: "Create Admin", icon: UserPlus },
+  { id: "manage", label: "Manage Admins", icon: ListChecks },
+];
+
+function formatDateTime(value) {
+  if (!value) return "-";
+
+  try {
+    return new Intl.DateTimeFormat("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return "-";
+  }
+}
+
+function getInitials(name = "Admin") {
+  const parts = String(name || "Admin")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return `${parts[0]?.[0] || ""}${parts[1]?.[0] || ""}`.toUpperCase();
+}
+
+function normalizeRole(role = "admin") {
+  const value = String(role || "admin").toLowerCase();
+
+  if (value === "superadmin") return "super_admin";
+  return value;
+}
+
+function getRoleLabel(role = "admin") {
+  const normalizedRole = normalizeRole(role);
+
+  if (normalizedRole === "super_admin") return "Super Admin";
+  return "Admin";
+}
+
+function StatusPill({ active }) {
+  return (
+    <span
+      className={
+        active
+          ? "amg-status amg-status--active"
+          : "amg-status amg-status--inactive"
+      }
+    >
+      {active ? "Active" : "Inactive"}
+    </span>
+  );
+}
+
+function RolePill({ role }) {
+  const normalizedRole = normalizeRole(role);
+
+  return (
+    <span
+      className={
+        normalizedRole === "super_admin"
+          ? "amg-status amg-status--super"
+          : "amg-status amg-status--admin"
+      }
+    >
+      {getRoleLabel(normalizedRole)}
+    </span>
+  );
+}
+
+function MetricCard({ icon: Icon, label, value, helper, tone = "green" }) {
+  return (
+    <article className={`amg-metric-card amg-metric-card--${tone}`}>
+      <div className="amg-metric-card__icon">
+        <Icon size={20} />
+      </div>
+
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        {helper ? <p>{helper}</p> : null}
+      </div>
+    </article>
+  );
+}
+
+function AdminCard({ admin, actionId, onActivate, onDeactivate }) {
+  const normalizedRole = normalizeRole(admin?.role);
+  const isSuperAdmin = normalizedRole === "super_admin";
+  const isActive = admin?.isActive !== false;
+  const isBusy = actionId === admin?._id;
+
+  return (
+    <article className="amg-admin-card">
+      <div className="amg-admin-card__top">
+        <div className="amg-admin-avatar">
+          {admin?.profilePhotoUrl ? (
+            <img src={admin.profilePhotoUrl} alt={admin.fullName || "Admin"} />
+          ) : (
+            <span>{getInitials(admin?.fullName || "Admin")}</span>
+          )}
+        </div>
+
+        <div className="amg-admin-title">
+          <h4>{admin?.fullName || "Admin User"}</h4>
+          <p>{admin?.email || "No email available"}</p>
+        </div>
+
+        <RolePill role={admin?.role} />
+      </div>
+
+      <div className="amg-admin-meta">
+        <div>
+          <Mail size={15} />
+          <span>Email</span>
+          <strong>{admin?.email || "-"}</strong>
+        </div>
+
+        <div>
+          <ShieldCheck size={15} />
+          <span>Mobile</span>
+          <strong>{admin?.mobileNumber || "-"}</strong>
+        </div>
+
+        <div>
+          <BadgeCheck size={15} />
+          <span>Status</span>
+          <strong>{isActive ? "Active" : "Inactive"}</strong>
+        </div>
+
+        <div>
+          <Shield size={15} />
+          <span>Created</span>
+          <strong>{formatDateTime(admin?.createdAt)}</strong>
+        </div>
+      </div>
+
+      <div className="amg-chip-row">
+        <StatusPill active={isActive} />
+
+        <span className="amg-id-chip">
+          <CheckCircle2 size={13} />
+          ID: {String(admin?._id || "").slice(-6)}
+        </span>
+
+        {isSuperAdmin ? (
+          <span className="amg-id-chip amg-id-chip--super">
+            <Crown size={13} />
+            Full access
+          </span>
+        ) : null}
+      </div>
+
+      {!isSuperAdmin ? (
+        <div className="amg-admin-card__actions">
+          {isActive ? (
+            <button
+              type="button"
+              className="amg-danger-btn"
+              onClick={() => onDeactivate(admin)}
+              disabled={isBusy}
+            >
+              <XCircle size={15} />
+              {isBusy ? "Updating..." : "Deactivate"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="adm-primary-btn"
+              onClick={() => onActivate(admin)}
+              disabled={isBusy}
+            >
+              <CheckCircle2 size={15} />
+              {isBusy ? "Updating..." : "Activate"}
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="amg-super-note">
+          <Crown size={15} />
+          Super admin account cannot be restricted from this panel.
+        </div>
+      )}
+    </article>
+  );
+}
 
 export default function ManageAdminsPage() {
+  const [activeTab, setActiveTab] = useState("overview");
   const [form, setForm] = useState(initialForm);
+
   const [admins, setAdmins] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState(null);
+
+  const [loadingAdmins, setLoadingAdmins] = useState(true);
   const [createLoading, setCreateLoading] = useState(false);
+  const [actionId, setActionId] = useState("");
+
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
 
-  const totalAdmins = admins.length;
-  const activeAdmins = useMemo(
-    () => admins.filter((item) => item?.isActive !== false).length,
-    [admins],
-  );
-  const superAdmins = useMemo(
-    () =>
-      admins.filter((item) =>
-        ["super_admin", "superadmin"].includes(
-          String(item?.role || "").toLowerCase(),
-        ),
-      ).length,
-    [admins],
-  );
+  const totalAdmins = Number(pagination?.totalItems || admins.length || 0);
 
-  const filteredAdmins = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
+  const stats = useMemo(() => {
+    return admins.reduce(
+      (acc, admin) => {
+        const role = normalizeRole(admin?.role);
 
-    if (!keyword) return admins;
+        if (role === "super_admin") acc.superAdmins += 1;
+        else acc.admins += 1;
 
-    return admins.filter((admin) => {
-      return (
-        String(admin?.fullName || "")
-          .toLowerCase()
-          .includes(keyword) ||
-        String(admin?.email || "")
-          .toLowerCase()
-          .includes(keyword) ||
-        String(admin?.mobileNumber || "")
-          .toLowerCase()
-          .includes(keyword) ||
-        String(admin?.role || "")
-          .toLowerCase()
-          .includes(keyword)
-      );
-    });
-  }, [admins, search]);
+        if (admin?.isActive !== false) acc.active += 1;
+        else acc.inactive += 1;
 
-  const loadAdmins = async () => {
+        return acc;
+      },
+      {
+        admins: 0,
+        superAdmins: 0,
+        active: 0,
+        inactive: 0,
+      },
+    );
+  }, [admins]);
+
+  const latestAdmins = useMemo(() => admins.slice(0, 5), [admins]);
+
+  const loadAdmins = async (pageToLoad = page) => {
     try {
-      setLoading(true);
-      const data = await adminService.getAllAdmins();
-      setAdmins(
-        Array.isArray(data?.items)
-          ? data.items
-          : Array.isArray(data)
-            ? data
-            : [],
-      );
+      setLoadingAdmins(true);
+
+      const data = await adminService.getAdmins({
+        page: pageToLoad,
+        limit: PAGE_LIMIT,
+        ...(search.trim() ? { search: search.trim() } : {}),
+        ...(roleFilter ? { role: roleFilter } : {}),
+        ...(statusFilter ? { isActive: statusFilter } : {}),
+      });
+
+      setAdmins(Array.isArray(data?.items) ? data.items : []);
+      setPagination(data?.pagination || null);
+      setPage(pageToLoad);
     } catch (error) {
       toast.error(getApiErrorMessage(error));
       setAdmins([]);
+      setPagination(null);
     } finally {
-      setLoading(false);
+      setLoadingAdmins(false);
     }
   };
 
   useEffect(() => {
-    loadAdmins();
+    loadAdmins(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleChange = (event) => {
+  const handleFormChange = (event) => {
     const { name, value } = event.target;
 
-    setForm((prev) => ({
-      ...prev,
+    setForm((current) => ({
+      ...current,
       [name]: value,
     }));
   };
 
-  const handleCreate = async (event) => {
-    event.preventDefault();
-
+  const validateForm = () => {
     if (!form.fullName.trim()) {
       toast.error("Full name is required.");
-      return;
+      return false;
     }
 
-    if (!/\S+@\S+\.\S+/.test(form.email.trim())) {
-      toast.error("Please enter a valid email address.");
-      return;
+    if (!form.email.trim()) {
+      toast.error("Email is required.");
+      return false;
     }
 
-    if (!/^[6-9]\d{9}$/.test(form.mobileNumber.trim())) {
-      toast.error("Please enter a valid 10-digit mobile number.");
-      return;
+    if (!form.mobileNumber.trim()) {
+      toast.error("Mobile number is required.");
+      return false;
     }
 
-    if (!form.password || form.password.length < 8) {
-      toast.error("Password must contain at least 8 characters.");
-      return;
+    if (!form.dob) {
+      toast.error("Date of birth is required.");
+      return false;
     }
+
+    if (!form.password.trim() || form.password.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleCreateAdmin = async (event) => {
+    event.preventDefault();
+
+    if (!validateForm()) return;
 
     try {
       setCreateLoading(true);
 
       await adminService.createAdmin({
         fullName: form.fullName.trim(),
-        email: form.email.trim(),
+        email: form.email.trim().toLowerCase(),
         mobileNumber: form.mobileNumber.trim(),
         password: form.password,
         dob: form.dob,
         role: form.role,
       });
 
-      toast.success("Admin account created successfully.");
+      toast.success("Admin created successfully.");
       setForm(initialForm);
-      await loadAdmins();
+      setActiveTab("manage");
+      await loadAdmins(1);
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     } finally {
@@ -144,211 +366,428 @@ export default function ManageAdminsPage() {
     }
   };
 
+  const handleActivate = async (admin) => {
+    if (!admin?._id) return;
+
+    try {
+      setActionId(admin._id);
+      await adminService.activateAdmin(admin._id);
+      toast.success("Admin activated.");
+      await loadAdmins(page);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setActionId("");
+    }
+  };
+
+  const handleDeactivate = async (admin) => {
+    if (!admin?._id) return;
+
+    const shouldDeactivate = window.confirm(
+      `Deactivate ${admin.fullName || "this admin"}?`,
+    );
+
+    if (!shouldDeactivate) return;
+
+    try {
+      setActionId(admin._id);
+      await adminService.deactivateAdmin(admin._id);
+      toast.success("Admin deactivated.");
+      await loadAdmins(page);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setActionId("");
+    }
+  };
+
+  const handleSearchSubmit = async (event) => {
+    event.preventDefault();
+    await loadAdmins(1);
+  };
+
+  const handleRefresh = async () => {
+    await loadAdmins(page);
+    toast.success("Admins refreshed.");
+  };
+
+  const currentPage = Number(pagination?.currentPage || page || 1);
+  const totalPages = Number(pagination?.totalPages || 1);
+
   return (
-    <section className="admin-crud">
-      <div className="admin-crud__hero">
-        <div className="admin-crud__hero-copy">
-          <span className="admin-crud__eyebrow">
-            <Shield size={14} />
-            Administrative access
+    <section className="admin-crud amg-page">
+      <section className="amg-hero">
+        <div>
+          <span className="adm-eyebrow">
+            <Shield size={15} />
+            Super admin control
           </span>
 
-          <h2>
-            Manage platform administrators with clear role control and account
-            visibility.
-          </h2>
+          <h2>Manage administrator access with a clean security workflow.</h2>
 
-          <p>
-            Administrator accounts should remain limited, traceable, and easy to
-            review. This page helps create new admin users and monitor the
-            current set of active platform operators.
-          </p>
+          <div className="amg-hero-actions">
+            <button
+              type="button"
+              className="adm-primary-btn"
+              onClick={() => setActiveTab("create")}
+            >
+              <UserPlus size={16} />
+              Create Admin
+            </button>
+
+            <button
+              type="button"
+              className="adm-secondary-btn"
+              onClick={() => setActiveTab("manage")}
+            >
+              Manage List
+            </button>
+          </div>
         </div>
 
-        <div className="admin-crud__hero-grid">
-          <div className="admin-crud__hero-stat">
-            <span>Total admins</span>
-            <strong>{totalAdmins}</strong>
+        <div className="amg-hero-mini-grid">
+          <div>
+            <span>Total</span>
+            <strong>{loadingAdmins ? "..." : totalAdmins}</strong>
           </div>
-          <div className="admin-crud__hero-stat">
-            <span>Active admins</span>
-            <strong>{activeAdmins}</strong>
+
+          <div>
+            <span>Active</span>
+            <strong>{loadingAdmins ? "..." : stats.active}</strong>
           </div>
-          <div className="admin-crud__hero-stat">
+
+          <div>
             <span>Super admins</span>
-            <strong>{superAdmins}</strong>
-          </div>
-          <div className="admin-crud__hero-stat">
-            <span>Visible after search</span>
-            <strong>{filteredAdmins.length}</strong>
+            <strong>{loadingAdmins ? "..." : stats.superAdmins}</strong>
           </div>
         </div>
+      </section>
+
+      <div className="adm-tabs" role="tablist" aria-label="Admin sections">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              className={activeTab === tab.id ? "is-active" : ""}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <Icon size={16} />
+              {tab.label}
+            </button>
+          );
+        })}
+
+        <button
+          type="button"
+          className="amg-refresh-tab"
+          onClick={handleRefresh}
+          disabled={loadingAdmins}
+        >
+          <RefreshCw size={15} />
+          Refresh
+        </button>
       </div>
 
-      <div className="admin-crud__grid">
-        <div className="admin-crud__panel admin-crud__panel--sticky">
-          <div className="admin-crud__panel-header">
-            <div>
-              <h3>Create admin account</h3>
-              <p>
-                Add a new administrator with the correct role and access level.
-              </p>
-            </div>
-            <span className="admin-crud__panel-badge">
-              <UserPlus size={16} />
-            </span>
+      {activeTab === "overview" && (
+        <div className="amg-tab-panel">
+          <div className="amg-metric-grid">
+            <MetricCard
+              icon={Users}
+              label="Admins"
+              value={stats.admins}
+              helper="Standard access"
+              tone="green"
+            />
+
+            <MetricCard
+              icon={Crown}
+              label="Super Admins"
+              value={stats.superAdmins}
+              helper="Full control"
+              tone="purple"
+            />
+
+            <MetricCard
+              icon={CheckCircle2}
+              label="Active"
+              value={stats.active}
+              helper="Can access panel"
+              tone="amber"
+            />
+
+            <MetricCard
+              icon={XCircle}
+              label="Inactive"
+              value={stats.inactive}
+              helper="Access restricted"
+              tone="rose"
+            />
           </div>
 
-          <form className="admin-crud__form" onSubmit={handleCreate}>
-            <InputField
-              label="Full Name"
-              name="fullName"
-              placeholder="Enter full name"
-              value={form.fullName}
-              onChange={handleChange}
-            />
+          <section className="amg-panel-card">
+            <div className="amg-panel-header">
+              <div>
+                <h3>Latest admins</h3>
+                <span>Quick preview from current list</span>
+              </div>
 
-            <InputField
-              label="Email"
-              name="email"
-              type="email"
-              placeholder="Enter email address"
-              value={form.email}
-              onChange={handleChange}
-            />
+              <button
+                type="button"
+                className="adm-secondary-btn"
+                onClick={() => setActiveTab("manage")}
+              >
+                Open Manage
+              </button>
+            </div>
 
-            <InputField
-              label="Mobile Number"
-              name="mobileNumber"
-              placeholder="Enter 10-digit mobile number"
-              value={form.mobileNumber}
-              onChange={handleChange}
-            />
+            {loadingAdmins ? (
+              <div className="amg-empty-box">Loading admins...</div>
+            ) : latestAdmins.length ? (
+              <div className="amg-compact-list">
+                {latestAdmins.map((admin) => (
+                  <article key={admin._id} className="amg-compact-row">
+                    <div className="amg-compact-avatar">
+                      {admin?.profilePhotoUrl ? (
+                        <img
+                          src={admin.profilePhotoUrl}
+                          alt={admin.fullName || "Admin"}
+                        />
+                      ) : (
+                        <span>{getInitials(admin?.fullName || "Admin")}</span>
+                      )}
+                    </div>
 
-            <InputField
-              label="Password"
-              name="password"
-              type="password"
-              placeholder="Create password"
-              value={form.password}
-              onChange={handleChange}
-            />
+                    <div>
+                      <h4>{admin?.fullName || "Admin"}</h4>
+                      <p>
+                        {admin?.email || "No email"} •{" "}
+                        {getRoleLabel(admin?.role)}
+                      </p>
+                    </div>
 
-            <div className="admin-crud__form-grid">
-              <InputField
-                label="Date of Birth"
-                name="dob"
-                type="date"
-                value={form.dob}
-                onChange={handleChange}
-              />
+                    <StatusPill active={admin?.isActive !== false} />
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="amg-empty-box">No admins found.</div>
+            )}
+          </section>
+        </div>
+      )}
 
-              <div className="form-field">
-                <label className="form-label">Role</label>
-                <select
-                  className="admin-crud__select"
-                  name="role"
-                  value={form.role}
-                  onChange={handleChange}
+      {activeTab === "create" && (
+        <div className="amg-tab-panel">
+          <section className="amg-panel-card">
+            <div className="amg-panel-header">
+              <div>
+                <h3>Create administrator</h3>
+                <span>
+                  Give access carefully. Admin accounts can control elections.
+                </span>
+              </div>
+
+              <span className="amg-panel-badge">Secure</span>
+            </div>
+
+            <form className="amg-form" onSubmit={handleCreateAdmin}>
+              <div className="amg-form-grid">
+                <InputField
+                  label="Full Name"
+                  name="fullName"
+                  placeholder="Admin full name"
+                  value={form.fullName}
+                  onChange={handleFormChange}
+                />
+
+                <InputField
+                  label="Email"
+                  name="email"
+                  type="email"
+                  placeholder="admin@example.com"
+                  value={form.email}
+                  onChange={handleFormChange}
+                />
+
+                <InputField
+                  label="Mobile Number"
+                  name="mobileNumber"
+                  placeholder="10 digit mobile number"
+                  value={form.mobileNumber}
+                  onChange={handleFormChange}
+                />
+
+                <InputField
+                  label="Date of Birth"
+                  name="dob"
+                  type="date"
+                  value={form.dob}
+                  onChange={handleFormChange}
+                />
+
+                <InputField
+                  label="Temporary Password"
+                  name="password"
+                  type="password"
+                  placeholder="At least 8 characters"
+                  value={form.password}
+                  onChange={handleFormChange}
+                />
+
+                <div className="form-field amg-form-grid__full">
+                  <label className="form-label">Role</label>
+                  <select
+                    name="role"
+                    value={form.role}
+                    onChange={handleFormChange}
+                    className="admin-crud__select"
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="super_admin">Super Admin</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="amg-warning-box">
+                <Shield size={17} />
+                <div>
+                  <strong>Access warning</strong>
+                  <p>
+                    Super admin can manage admins and system settings. Do not
+                    assign it casually.
+                  </p>
+                </div>
+              </div>
+
+              <div className="amg-form-actions">
+                <Button
+                  className="admin-crud__submit"
+                  type="submit"
+                  loading={createLoading}
                 >
-                  <option value="admin">Admin</option>
-                  <option value="super_admin">Super Admin</option>
-                </select>
+                  Create Admin
+                </Button>
+
+                <button
+                  type="button"
+                  className="adm-secondary-btn"
+                  onClick={() => setForm(initialForm)}
+                  disabled={createLoading}
+                >
+                  Reset
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {activeTab === "manage" && (
+        <div className="amg-tab-panel">
+          <section className="amg-panel-card">
+            <div className="amg-panel-header">
+              <div>
+                <h3>Manage administrators</h3>
+                <span>{totalAdmins} admin account(s)</span>
               </div>
             </div>
 
-            <p className="admin-crud__inline-note">
-              Assign elevated roles carefully. Super Admin access should remain
-              tightly controlled.
-            </p>
+            <form className="amg-filter-bar" onSubmit={handleSearchSubmit}>
+              <label className="amg-search-box">
+                <Search size={16} />
+                <input
+                  type="text"
+                  placeholder="Search by name, email, or mobile"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </label>
 
-            <Button
-              className="admin-crud__submit"
-              type="submit"
-              loading={createLoading}
-            >
-              Create Admin
-            </Button>
-          </form>
+              <label className="amg-filter-select">
+                <Filter size={16} />
+                <select
+                  value={roleFilter}
+                  onChange={(event) => setRoleFilter(event.target.value)}
+                >
+                  <option value="">All roles</option>
+                  <option value="admin">Admin</option>
+                  <option value="super_admin">Super Admin</option>
+                </select>
+              </label>
+
+              <label className="amg-filter-select">
+                <ShieldCheck size={16} />
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                >
+                  <option value="">All status</option>
+                  <option value="true">Active</option>
+                  <option value="false">Inactive</option>
+                </select>
+              </label>
+
+              <Button type="submit" variant="secondary" loading={loadingAdmins}>
+                Apply
+              </Button>
+            </form>
+
+            {loadingAdmins ? (
+              <div className="amg-empty-box amg-empty-box--large">
+                Loading admins...
+              </div>
+            ) : admins.length ? (
+              <div className="amg-admin-grid">
+                {admins.map((admin) => (
+                  <AdminCard
+                    key={admin._id}
+                    admin={admin}
+                    actionId={actionId}
+                    onActivate={handleActivate}
+                    onDeactivate={handleDeactivate}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="amg-empty-box amg-empty-box--large">
+                No admins found for current filters.
+              </div>
+            )}
+
+            {pagination && totalPages > 1 ? (
+              <div className="amg-pagination">
+                <button
+                  type="button"
+                  className="adm-secondary-btn"
+                  onClick={() => loadAdmins(Math.max(currentPage - 1, 1))}
+                  disabled={!pagination.hasPrevPage || loadingAdmins}
+                >
+                  Previous
+                </button>
+
+                <span>
+                  Page {currentPage} of {totalPages}
+                </span>
+
+                <button
+                  type="button"
+                  className="adm-primary-btn"
+                  onClick={() =>
+                    loadAdmins(Math.min(currentPage + 1, totalPages))
+                  }
+                  disabled={!pagination.hasNextPage || loadingAdmins}
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
+          </section>
         </div>
-
-        <div className="admin-crud__panel">
-          <div className="admin-crud__toolbar">
-            <div className="admin-crud__toolbar-left">
-              <h3 style={{ margin: 0 }}>Admin accounts</h3>
-              <span className="admin-crud__meta">
-                {filteredAdmins.length} item(s)
-              </span>
-            </div>
-
-            <div className="admin-crud__toolbar-right">
-              <InputField
-                className="admin-crud__search"
-                placeholder="Search by name, email, mobile, or role"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="admin-crud__empty">
-              <p>Loading admin accounts...</p>
-            </div>
-          ) : filteredAdmins.length === 0 ? (
-            <div className="admin-crud__empty">
-              <p>No admin accounts match the current search.</p>
-            </div>
-          ) : (
-            <div className="admin-crud__list">
-              {filteredAdmins.map((admin) => {
-                const roleKey = String(admin?.role || "").toLowerCase();
-
-                return (
-                  <article key={admin._id} className="admin-crud__card">
-                    <div className="admin-crud__card-top">
-                      <div className="admin-crud__title-stack">
-                        <h4>{admin?.fullName || "Admin User"}</h4>
-                        <p>{admin?.email || "No email available"}</p>
-                      </div>
-
-                      <span
-                        className={
-                          roleClassMap[roleKey] ||
-                          "admin-crud__status admin-crud__status--active"
-                        }
-                      >
-                        {admin?.role || "admin"}
-                      </span>
-                    </div>
-
-                    <div className="admin-crud__chips">
-                      <span className="admin-crud__chip">
-                        <UserCog size={14} />
-                        {admin?.mobileNumber || "No mobile number"}
-                      </span>
-
-                      <span className="admin-crud__chip">
-                        <ShieldCheck size={14} />
-                        {admin?.isActive !== false
-                          ? "Active account"
-                          : "Inactive account"}
-                      </span>
-
-                      <span className="admin-crud__chip">
-                        Created:{" "}
-                        {admin?.createdAt
-                          ? new Date(admin.createdAt).toLocaleDateString()
-                          : "-"}
-                      </span>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
+      )}
     </section>
   );
 }

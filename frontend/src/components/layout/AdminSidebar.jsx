@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
+  LogOut,
   Settings2,
   Shield,
   Sparkles,
@@ -188,7 +189,7 @@ export default function AdminSidebar({
   isDesktopCollapsed = false,
   onDesktopToggle = () => {},
 }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   const role = String(user?.role || "").toLowerCase();
   const isSuperAdmin = role === "super_admin" || role === "superadmin";
@@ -201,6 +202,14 @@ export default function AdminSidebar({
     if (isMobileOpen) {
       onClose();
     }
+  };
+
+  const handleLogout = async () => {
+    const shouldLogout = window.confirm("Logout from admin panel?");
+
+    if (!shouldLogout) return;
+
+    await logout();
   };
 
   return (
@@ -290,12 +299,29 @@ export default function AdminSidebar({
           ))}
         </nav>
 
-        {!isDesktopCollapsed ? (
-          <div className="admin-sidebar__footer">
-            <BarChart3 size={16} />
-            <span>Clean control mode</span>
-          </div>
-        ) : null}
+        <div className="admin-sidebar__bottom">
+          {!isDesktopCollapsed ? (
+            <div className="admin-sidebar__footer">
+              <BarChart3 size={16} />
+              <span>Clean control mode</span>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            className={
+              isDesktopCollapsed
+                ? "admin-sidebar__logout admin-sidebar__logout--collapsed"
+                : "admin-sidebar__logout"
+            }
+            onClick={handleLogout}
+            title={isDesktopCollapsed ? "Logout" : undefined}
+          >
+            <LogOut size={18} />
+
+            {!isDesktopCollapsed ? <span>Logout</span> : null}
+          </button>
+        </div>
       </aside>
 
       {isMobileOpen ? (

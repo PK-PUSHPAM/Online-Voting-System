@@ -1,0 +1,421 @@
+/* =========================================================
+   ADMIN MOBILE + SIDEBAR FINAL HARDENING
+   Import this file after admin-final-polish.css
+========================================================= */
+
+/* Shell safety */
+
+.admin-shell {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden !important;
+}
+
+.admin-shell__inner,
+.admin-shell__main,
+.admin-shell__content {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.admin-shell__content {
+  overflow-x: hidden !important;
+}
+
+/* Sidebar scroll and bottom stability */
+
+.admin-sidebar {
+  max-height: calc(100vh - 24px) !important;
+  overflow: hidden !important;
+}
+
+.admin-sidebar__nav {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding-right: 4px !important;
+  scrollbar-width: thin;
+}
+
+.admin-sidebar__nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.admin-sidebar__nav::-webkit-scrollbar-thumb {
+  background: #d8cbb8;
+  border-radius: 999px;
+}
+
+.admin-sidebar__bottom {
+  flex: 0 0 auto !important;
+  padding-top: 4px !important;
+}
+
+/* Sidebar collapsed cleanup */
+
+.admin-sidebar--collapsed .admin-sidebar__top {
+  justify-content: center !important;
+}
+
+.admin-sidebar--collapsed .admin-sidebar__brand {
+  justify-content: center !important;
+}
+
+.admin-sidebar--collapsed .admin-sidebar__top-actions {
+  justify-content: center !important;
+}
+
+.admin-sidebar--collapsed .admin-sidebar__nav {
+  padding-right: 0 !important;
+}
+
+.admin-sidebar--collapsed .admin-sidebar__link {
+  justify-content: center !important;
+  padding: 0 !important;
+}
+
+.admin-sidebar--collapsed .admin-sidebar__link-icon {
+  margin: 0 !important;
+}
+
+/* Topbar final mobile behavior */
+
+@media (max-width: 760px) {
+  .admin-topbar {
+    position: sticky !important;
+    top: 10px !important;
+    z-index: 35 !important;
+    backdrop-filter: blur(18px) !important;
+  }
+
+  .admin-topbar__left {
+    overflow: hidden !important;
+  }
+
+  .admin-topbar__title-wrap h1 {
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .admin-topbar__right {
+    overflow: visible !important;
+  }
+
+  .admin-center-wrap {
+    z-index: 50 !important;
+  }
+
+  .admin-center-dropdown {
+    position: fixed !important;
+    top: 76px !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: calc(100vh - 92px) !important;
+    overflow: hidden !important;
+    z-index: 80 !important;
+  }
+
+  .admin-center-dropdown__body,
+  .admin-chat-panel__body {
+    max-height: calc(100vh - 250px) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  .admin-chat-form {
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 3 !important;
+  }
+}
+
+/* Mobile sidebar modal behavior */
+
+@media (max-width: 920px) {
+  .admin-sidebar {
+    position: fixed !important;
+    top: 10px !important;
+    left: 10px !important;
+    bottom: 10px !important;
+    width: min(340px, calc(100vw - 20px)) !important;
+    height: auto !important;
+    max-height: none !important;
+    z-index: 70 !important;
+    transform: translateX(calc(-100% - 24px)) !important;
+    transition:
+      transform 220ms ease,
+      opacity 220ms ease !important;
+    opacity: 0 !important;
+  }
+
+  .admin-sidebar--mobile-open {
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+  }
+
+  .admin-sidebar__mobile-close {
+    display: inline-flex !important;
+  }
+
+  .admin-sidebar__desktop-toggle {
+    display: none !important;
+  }
+
+  .admin-sidebar__backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 60 !important;
+    background: rgba(29, 36, 32, 0.45) !important;
+    backdrop-filter: blur(4px) !important;
+  }
+
+  .admin-sidebar__nav {
+    max-height: none !important;
+  }
+
+  .admin-sidebar__logout {
+    min-height: 46px !important;
+  }
+}
+
+/* Desktop sidebar behavior */
+
+@media (min-width: 921px) {
+  .admin-sidebar__mobile-close {
+    display: none !important;
+  }
+
+  .admin-sidebar__desktop-toggle {
+    display: inline-flex !important;
+  }
+}
+
+/* Prevent grid overflow on all redesigned admin pages */
+
+.adm-metric-grid,
+.aep-metric-grid,
+.amp-metric-grid,
+.acp-metric-grid,
+.avp-metric-grid,
+.arp-metric-grid,
+.amg-metric-grid,
+.asc2-metric-grid,
+.adm-chart-grid,
+.arp-chart-grid,
+.aep-election-grid,
+.amp-post-grid,
+.acp-candidate-grid,
+.avp-voter-grid,
+.amg-admin-grid,
+.asc2-block-grid,
+.arp-winner-grid {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.adm-metric-grid > *,
+.aep-metric-grid > *,
+.amp-metric-grid > *,
+.acp-metric-grid > *,
+.avp-metric-grid > *,
+.arp-metric-grid > *,
+.amg-metric-grid > *,
+.asc2-metric-grid > *,
+.adm-chart-grid > *,
+.arp-chart-grid > *,
+.aep-election-grid > *,
+.amp-post-grid > *,
+.acp-candidate-grid > *,
+.avp-voter-grid > *,
+.amg-admin-grid > *,
+.asc2-block-grid > *,
+.arp-winner-grid > * {
+  min-width: 0 !important;
+}
+
+/* Text overflow protection */
+
+.admin-crud h2,
+.admin-crud h3,
+.admin-crud h4,
+.adm-dashboard-page h2,
+.adm-dashboard-page h3,
+.adm-dashboard-page h4 {
+  overflow-wrap: anywhere;
+}
+
+.aep-election-card__top p,
+.amp-post-card__top p,
+.acp-manifesto-box p,
+.avp-rejection-box p,
+.arp-post-card__header p,
+.asc2-reason-box p {
+  overflow-wrap: anywhere;
+}
+
+/* Better mobile tabs */
+
+@media (max-width: 760px) {
+  .adm-tabs {
+    padding: 7px !important;
+    border-radius: 18px !important;
+    gap: 7px !important;
+  }
+
+  .adm-tabs button {
+    min-height: 40px !important;
+    padding: 0 13px !important;
+    border-radius: 14px !important;
+    font-size: 12px !important;
+  }
+
+  .adm-tabs button svg {
+    width: 15px !important;
+    height: 15px !important;
+  }
+}
+
+/* Better mobile forms */
+
+@media (max-width: 760px) {
+  .form-input,
+  .admin-crud__select,
+  .admin-crud__textarea,
+  .aep-search-box,
+  .aep-filter-select,
+  .amp-search-box,
+  .amp-filter-select,
+  .acp-search-box,
+  .acp-filter-select,
+  .avp-search-box,
+  .avp-filter-select,
+  .amg-search-box,
+  .amg-filter-select,
+  .asc2-search-box,
+  .arp-context-card select,
+  .acp-context-grid select {
+    min-height: 44px !important;
+    border-radius: 14px !important;
+  }
+
+  .admin-crud__textarea {
+    min-height: 96px !important;
+  }
+
+  .form-label {
+    font-size: 11px !important;
+  }
+}
+
+/* Better mobile cards */
+
+@media (max-width: 760px) {
+  .adm-panel-card,
+  .aep-panel-card,
+  .amp-panel-card,
+  .acp-panel-card,
+  .avp-panel-card,
+  .arp-panel-card,
+  .amg-panel-card,
+  .asc2-panel-card,
+  .adm-chart-card,
+  .arp-chart-card {
+    box-shadow: 0 12px 30px rgba(61, 48, 35, 0.06) !important;
+  }
+
+  .aep-election-card,
+  .amp-post-card,
+  .acp-candidate-card,
+  .avp-voter-card,
+  .arp-post-card,
+  .amg-admin-card,
+  .asc2-block-card {
+    box-shadow: none !important;
+  }
+}
+
+/* Extra small mobile hardening */
+
+@media (max-width: 420px) {
+  .admin-shell__inner {
+    padding: 9px !important;
+  }
+
+  .admin-shell__content {
+    padding-top: 10px !important;
+  }
+
+  .admin-topbar {
+    top: 8px !important;
+    min-height: 58px !important;
+  }
+
+  .admin-topbar__title-wrap h1 {
+    font-size: 0.92rem !important;
+  }
+
+  .admin-center-dropdown {
+    top: 68px !important;
+    left: 8px !important;
+    right: 8px !important;
+    border-radius: 18px !important;
+  }
+
+  .admin-sidebar {
+    top: 8px !important;
+    left: 8px !important;
+    bottom: 8px !important;
+    width: calc(100vw - 16px) !important;
+    border-radius: 22px !important;
+  }
+
+  .adm-eyebrow {
+    min-height: 28px !important;
+    padding: 0 10px !important;
+    font-size: 10px !important;
+  }
+
+  .adm-primary-btn,
+  .adm-secondary-btn,
+  .admin-crud__submit,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger {
+    min-height: 40px !important;
+    font-size: 12px !important;
+  }
+
+  .adm-tabs {
+    margin-left: -1px !important;
+    margin-right: -1px !important;
+  }
+}
+
+/* Print-like clean if browser zoom is high */
+
+@media (max-width: 360px) {
+  .admin-topbar__title-wrap h1 {
+    max-width: 38vw !important;
+  }
+
+  .admin-center-button,
+  .admin-topbar__profile,
+  .admin-topbar__avatar,
+  .admin-topbar__menu-btn {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+  }
+
+  .admin-center-button svg,
+  .admin-topbar__menu-btn svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+}

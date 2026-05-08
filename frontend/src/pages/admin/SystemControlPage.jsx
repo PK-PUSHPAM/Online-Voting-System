@@ -2,10 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   Ban,
-  Clock3,
+  FileSearch,
+  Filter,
+  LayoutGrid,
   MessageCircle,
   RefreshCw,
+  Search,
   Shield,
+  ShieldAlert,
   ShieldCheck,
   Unlock,
   UserRoundX,
@@ -15,9 +19,14 @@ import { adminService } from "../../services/admin.service";
 import { publicChatService } from "../../services/publicChat.service";
 import { getApiErrorMessage } from "../../lib/utils";
 import "../../styles/admin-crud.css";
+import "../../styles/admin-light-theme.css";
+
+const AUDIT_LIMIT = 10;
+const BLOCK_LIMIT = 10;
 
 const tabs = [
-  { id: "audit", label: "Audit Logs", icon: Activity },
+  { id: "overview", label: "Overview", icon: LayoutGrid },
+  { id: "audit", label: "Audit Logs", icon: FileSearch },
   { id: "blockedChat", label: "Chat Blocks", icon: Ban },
 ];
 
@@ -47,12 +56,199 @@ function getInitials(name = "User") {
   return `${parts[0]?.[0] || ""}${parts[1]?.[0] || ""}`.toUpperCase();
 }
 
+function getActorName(log) {
+  return (
+    log?.actorId?.fullName ||
+    log?.performedBy?.fullName ||
+    log?.meta?.fullName ||
+    log?.meta?.email ||
+    "System"
+  );
+}
+
+function getActorEmail(log) {
+  return log?.actorId?.email || log?.meta?.email || "";
+}
+
+function getActorRole(log) {
+  return (
+    log?.actorId?.role || log?.performedBy?.role || log?.actorRole || "system"
+  );
+}
+
+function getTargetId(log) {
+  if (!log?.targetId) return "";
+  return String(log.targetId).slice(-8);
+}
+
+function getLogMessage(log) {
+  if (log?.description) return log.description;
+  if (log?.message) return log.message;
+
+  if (log?.meta?.reason) return log.meta.reason;
+  if (log?.meta?.rejectionReason) return log.meta.rejectionReason;
+
+  if (log?.action) {
+    return `Recorded action: ${log.action}`;
+  }
+
+  return "No description is available for this audit event.";
+}
+
+function MetricCard({ icon: Icon, label, value, helper, tone = "green" }) {
+  return (
+    <article className={`asc2-metric-card asc2-metric-card--${tone}`}>
+      <div className="asc2-metric-card__icon">
+        <Icon size={20} />
+      </div>
+
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        {helper ? <p>{helper}</p> : null}
+      </div>
+    </article>
+  );
+}
+
+function AuditLogCard({ log }) {
+  return (
+    <article className="asc2-audit-card">
+      <div className="asc2-audit-card__icon">
+        <Activity size={17} />
+      </div>
+
+      <div className="asc2-audit-card__main">
+        <div className="asc2-audit-card__top">
+          <h4>{log?.action || "System action"}</h4>
+          <span>{formatDateTime(log?.createdAt)}</span>
+        </div>
+
+        <p>{getLogMessage(log)}</p>
+
+        <div className="asc2-chip-row">
+          <span className="asc2-chip">
+            <ShieldCheck size={13} />
+            {getActorName(log)}
+          </span>
+
+          <span className="asc2-chip">
+            <Shield size={13} />
+            {getActorRole(log)}
+          </span>
+
+          {getActorEmail(log) ? (
+            <span className="asc2-chip">{getActorEmail(log)}</span>
+          ) : null}
+
+          {log?.targetType ? (
+            <span className="asc2-chip">{log.targetType}</span>
+          ) : null}
+
+          {getTargetId(log) ? (
+            <span className="asc2-chip">ID: {getTargetId(log)}</span>
+          ) : null}
+
+          {log?.status ? (
+            <span
+              className={
+                log.status === "success"
+                  ? "asc2-chip asc2-chip--success"
+                  : "asc2-chip asc2-chip--danger"
+              }
+            >
+              {log.status}
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function BlockedUserCard({ block, unblockingUserId, onUnblock }) {
+  const blockedUser = block?.userId || {};
+  const blockedBy = block?.blockedBy || {};
+  const initials = getInitials(blockedUser?.fullName || "User");
+
+  return (
+    <article className="asc2-block-card">
+      <div className="asc2-block-card__top">
+        <div className="asc2-block-avatar">
+          {blockedUser?.profilePhotoUrl ? (
+            <img
+              src={blockedUser.profilePhotoUrl}
+              alt={blockedUser.fullName || "Blocked user"}
+            />
+          ) : (
+            <span>{initials}</span>
+          )}
+        </div>
+
+        <div className="asc2-block-title">
+          <h4>{blockedUser?.fullName || "Blocked user"}</h4>
+          <p>{blockedUser?.email || "No email available"}</p>
+        </div>
+
+        <span className="asc2-status asc2-status--danger">
+          <Ban size={13} />
+          Blocked
+        </span>
+      </div>
+
+      <div className="asc2-block-meta">
+        <div>
+          <span>Role</span>
+          <strong>{blockedUser?.role || "-"}</strong>
+        </div>
+
+        <div>
+          <span>Blocked by</span>
+          <strong>{blockedBy?.fullName || "Admin"}</strong>
+        </div>
+
+        <div>
+          <span>Blocked at</span>
+          <strong>{formatDateTime(block?.createdAt)}</strong>
+        </div>
+      </div>
+
+      <div className="asc2-reason-box">
+        <MessageCircle size={15} />
+        <div>
+          <strong>Reason</strong>
+          <p>
+            {block?.reason || "No reason was provided by the administrator."}
+          </p>
+        </div>
+      </div>
+
+      <div className="asc2-block-card__actions">
+        <button
+          type="button"
+          className="adm-primary-btn"
+          onClick={() => onUnblock(block)}
+          disabled={unblockingUserId === blockedUser?._id}
+        >
+          <Unlock size={15} />
+          {unblockingUserId === blockedUser?._id
+            ? "Unblocking..."
+            : "Unblock User"}
+        </button>
+      </div>
+    </article>
+  );
+}
+
 export default function SystemControlPage() {
-  const [activeTab, setActiveTab] = useState("audit");
+  const [activeTab, setActiveTab] = useState("overview");
 
   const [logs, setLogs] = useState([]);
+  const [auditPagination, setAuditPagination] = useState(null);
+  const [auditPage, setAuditPage] = useState(1);
   const [loadingLogs, setLoadingLogs] = useState(true);
-  const [search, setSearch] = useState("");
+  const [auditSearch, setAuditSearch] = useState("");
+  const [auditError, setAuditError] = useState("");
 
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [blockedPagination, setBlockedPagination] = useState(null);
@@ -60,90 +256,71 @@ export default function SystemControlPage() {
   const [loadingBlockedUsers, setLoadingBlockedUsers] = useState(false);
   const [unblockingUserId, setUnblockingUserId] = useState("");
 
-  const filteredLogs = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
+  const auditTotal = Number(auditPagination?.totalItems || logs.length || 0);
+  const blockedTotal = Number(
+    blockedPagination?.totalItems || blockedUsers.length || 0,
+  );
 
-    if (!keyword) return logs;
-
-    return logs.filter((log) => {
-      return (
-        String(log?.action || "")
-          .toLowerCase()
-          .includes(keyword) ||
-        String(log?.description || "")
-          .toLowerCase()
-          .includes(keyword) ||
-        String(log?.performedBy?.fullName || "")
-          .toLowerCase()
-          .includes(keyword) ||
-        String(log?.performedBy?.role || "")
-          .toLowerCase()
-          .includes(keyword) ||
-        String(log?.actorId?.fullName || "")
-          .toLowerCase()
-          .includes(keyword) ||
-        String(log?.actorRole || "")
-          .toLowerCase()
-          .includes(keyword) ||
-        String(log?.targetType || "")
-          .toLowerCase()
-          .includes(keyword)
-      );
-    });
-  }, [logs, search]);
-
-  const totalLogs = logs.length;
-  const visibleLogs = filteredLogs.length;
-
-  const adminActions = useMemo(() => {
-    return logs.filter((log) => {
-      const role = String(
-        log?.performedBy?.role || log?.actorRole || "",
-      ).toLowerCase();
-
+  const stats = useMemo(() => {
+    const adminActions = logs.filter((log) => {
+      const role = String(getActorRole(log)).toLowerCase();
       return role.includes("admin");
     }).length;
-  }, [logs]);
 
-  const targetTypes = useMemo(() => {
-    return new Set(logs.map((log) => log?.targetType).filter(Boolean)).size;
-  }, [logs]);
+    const targetTypes = new Set(
+      logs.map((log) => log?.targetType).filter(Boolean),
+    ).size;
 
-  const loadLogs = async () => {
+    return {
+      auditLogs: auditTotal,
+      adminActions,
+      targetTypes,
+      blockedUsers: blockedTotal,
+    };
+  }, [auditTotal, blockedTotal, logs]);
+
+  const latestLogs = useMemo(() => logs.slice(0, 5), [logs]);
+  const latestBlocks = useMemo(() => blockedUsers.slice(0, 4), [blockedUsers]);
+
+  const loadLogs = async (pageToLoad = auditPage) => {
     try {
       setLoadingLogs(true);
+      setAuditError("");
 
       const data = await adminService.getAuditLogs({
-        page: 1,
-        limit: 50,
+        page: pageToLoad,
+        limit: AUDIT_LIMIT,
+        search: auditSearch,
       });
 
-      setLogs(
-        Array.isArray(data?.items)
-          ? data.items
-          : Array.isArray(data)
-            ? data
-            : [],
-      );
+      setLogs(Array.isArray(data?.items) ? data.items : []);
+      setAuditPagination(data?.pagination || null);
+      setAuditPage(pageToLoad);
     } catch (error) {
-      toast.error(getApiErrorMessage(error));
+      const message = getApiErrorMessage(error);
+
+      setAuditError(message);
       setLogs([]);
+      setAuditPagination(null);
+
+      toast.error(message);
     } finally {
       setLoadingLogs(false);
     }
   };
 
-  const loadBlockedUsers = async (page = blockedPage) => {
+  const loadBlockedUsers = async (pageToLoad = blockedPage) => {
     try {
       setLoadingBlockedUsers(true);
 
       const data = await publicChatService.getBlockedUsers({
-        page,
-        limit: 10,
+        page: pageToLoad,
+        limit: BLOCK_LIMIT,
       });
 
       setBlockedUsers(Array.isArray(data?.items) ? data.items : []);
       setBlockedPagination(data?.pagination || null);
+      setBlockedPage(pageToLoad);
     } catch (error) {
       toast.error(getApiErrorMessage(error));
       setBlockedUsers([]);
@@ -154,25 +331,30 @@ export default function SystemControlPage() {
   };
 
   useEffect(() => {
-    loadLogs();
+    loadLogs(1);
+    loadBlockedUsers(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (activeTab === "blockedChat") {
-      loadBlockedUsers(blockedPage);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, blockedPage]);
+  const handleAuditSearch = async (event) => {
+    event.preventDefault();
+    await loadLogs(1);
+  };
 
   const handleRefresh = async () => {
     if (activeTab === "audit") {
-      await loadLogs();
-      toast.success("Audit logs refreshed.");
+      await loadLogs(auditPage);
       return;
     }
 
-    await loadBlockedUsers(blockedPage);
-    toast.success("Blocked chat users refreshed.");
+    if (activeTab === "blockedChat") {
+      await loadBlockedUsers(blockedPage);
+      toast.success("Blocked users refreshed.");
+      return;
+    }
+
+    await Promise.all([loadLogs(auditPage), loadBlockedUsers(blockedPage)]);
+    toast.success("System control refreshed.");
   };
 
   const handleUnblockUser = async (block) => {
@@ -200,53 +382,66 @@ export default function SystemControlPage() {
     }
   };
 
+  const auditCurrentPage = Number(
+    auditPagination?.currentPage || auditPage || 1,
+  );
+  const auditTotalPages = Number(auditPagination?.totalPages || 1);
+
+  const blockCurrentPage = Number(
+    blockedPagination?.currentPage || blockedPage || 1,
+  );
+  const blockTotalPages = Number(blockedPagination?.totalPages || 1);
+
   return (
-    <section className="admin-crud">
-      <div className="admin-crud__hero">
-        <div className="admin-crud__hero-copy">
-          <span className="admin-crud__eyebrow">
-            <Shield size={14} />
+    <section className="admin-crud asc2-page">
+      <section className="asc2-hero">
+        <div>
+          <span className="adm-eyebrow">
+            <ShieldAlert size={15} />
             System control
           </span>
 
-          <h2>
-            Review audit activity and moderate public chat behavior across the
-            platform.
-          </h2>
+          <h2>Review system activity and moderate public chat safely.</h2>
 
-          <p>
-            Audit visibility and chat moderation are essential for
-            accountability. Use this page to inspect sensitive actions and
-            unblock users when moderation restrictions are no longer needed.
-          </p>
+          <div className="asc2-hero-actions">
+            <button
+              type="button"
+              className="adm-primary-btn"
+              onClick={() => setActiveTab("audit")}
+            >
+              <FileSearch size={16} />
+              Audit Logs
+            </button>
+
+            <button
+              type="button"
+              className="adm-secondary-btn"
+              onClick={() => setActiveTab("blockedChat")}
+            >
+              Chat Blocks
+            </button>
+          </div>
         </div>
 
-        <div className="admin-crud__hero-grid">
-          <div className="admin-crud__hero-stat">
-            <span>Total audit logs</span>
-            <strong>{totalLogs}</strong>
+        <div className="asc2-hero-mini-grid">
+          <div>
+            <span>Audit logs</span>
+            <strong>{loadingLogs ? "..." : stats.auditLogs}</strong>
           </div>
 
-          <div className="admin-crud__hero-stat">
-            <span>Visible after search</span>
-            <strong>{visibleLogs}</strong>
-          </div>
-
-          <div className="admin-crud__hero-stat">
+          <div>
             <span>Admin actions</span>
-            <strong>{adminActions}</strong>
+            <strong>{loadingLogs ? "..." : stats.adminActions}</strong>
           </div>
 
-          <div className="admin-crud__hero-stat">
-            <span>Blocked chat users</span>
-            <strong>
-              {blockedPagination?.totalItems ?? blockedUsers.length ?? 0}
-            </strong>
+          <div>
+            <span>Blocked users</span>
+            <strong>{loadingBlockedUsers ? "..." : stats.blockedUsers}</strong>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="asc-tabs" role="tablist" aria-label="System control tabs">
+      <div className="adm-tabs" role="tablist" aria-label="System sections">
         {tabs.map((tab) => {
           const Icon = tab.icon;
 
@@ -265,258 +460,309 @@ export default function SystemControlPage() {
 
         <button
           type="button"
-          className="asc-tabs__refresh"
+          className="asc2-refresh-tab"
           onClick={handleRefresh}
+          disabled={loadingLogs || loadingBlockedUsers}
         >
           <RefreshCw size={15} />
           Refresh
         </button>
       </div>
 
-      {activeTab === "audit" && (
-        <div className="admin-crud__panel">
-          <div className="admin-crud__toolbar">
-            <div className="admin-crud__toolbar-left">
-              <h3 style={{ margin: 0 }}>Audit logs</h3>
-              <span className="admin-crud__meta">{visibleLogs} item(s)</span>
-            </div>
+      {activeTab === "overview" && (
+        <div className="asc2-tab-panel">
+          <div className="asc2-metric-grid">
+            <MetricCard
+              icon={FileSearch}
+              label="Audit Logs"
+              value={stats.auditLogs}
+              helper="Current page"
+              tone="green"
+            />
 
-            <div className="admin-crud__toolbar-right">
-              <input
-                type="text"
-                className="form-input admin-crud__search"
-                placeholder="Search by action, description, role, or target"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </div>
+            <MetricCard
+              icon={ShieldCheck}
+              label="Admin Actions"
+              value={stats.adminActions}
+              helper="Detected logs"
+              tone="purple"
+            />
+
+            <MetricCard
+              icon={Filter}
+              label="Target Types"
+              value={stats.targetTypes}
+              helper="Log variety"
+              tone="amber"
+            />
+
+            <MetricCard
+              icon={Ban}
+              label="Chat Blocks"
+              value={stats.blockedUsers}
+              helper="Active restrictions"
+              tone="rose"
+            />
           </div>
 
-          {loadingLogs ? (
-            <div className="admin-crud__empty">
-              <p>Loading audit logs...</p>
-            </div>
-          ) : filteredLogs.length === 0 ? (
-            <div className="admin-crud__empty">
-              <p>No audit log entries match the current search.</p>
-            </div>
-          ) : (
-            <div className="admin-election-list">
-              {filteredLogs.map((log, index) => (
-                <article
-                  key={log._id || `${log.action}-${index}`}
-                  className="admin-election-list__item"
+          <div className="asc2-overview-grid">
+            <section className="asc2-panel-card">
+              <div className="asc2-panel-header">
+                <div>
+                  <h3>Latest audit logs</h3>
+                  <span>Recent sensitive actions</span>
+                </div>
+
+                <button
+                  type="button"
+                  className="adm-secondary-btn"
+                  onClick={() => setActiveTab("audit")}
                 >
-                  <div className="admin-election-list__rank">
-                    <Activity size={18} />
-                  </div>
+                  Open Logs
+                </button>
+              </div>
 
-                  <div className="admin-election-list__content">
-                    <div className="admin-election-list__top">
-                      <h4>{log?.action || "Administrative action"}</h4>
-                      <span className="admin-election-list__votes">
-                        {formatDateTime(log?.createdAt)}
-                      </span>
-                    </div>
-
-                    <div className="admin-election-list__meta">
-                      <span className="admin-crud__chip">
-                        <ShieldCheck size={14} />
-                        {log?.performedBy?.fullName ||
-                          log?.actorId?.fullName ||
-                          "System"}
-                      </span>
-
-                      <span className="admin-crud__chip">
-                        <Shield size={14} />
-                        {log?.performedBy?.role || log?.actorRole || "system"}
-                      </span>
-
-                      {log?.targetType ? (
-                        <span className="admin-crud__chip">
-                          {log.targetType}
-                        </span>
-                      ) : null}
-
-                      {log?.targetId ? (
-                        <span className="admin-crud__chip">
-                          ID: {String(log.targetId).slice(-8)}
-                        </span>
-                      ) : null}
-                    </div>
-
-                    <div style={{ marginTop: 12 }}>
-                      <p
-                        className="admin-crud__inline-note"
-                        style={{ margin: 0 }}
-                      >
-                        {log?.description ||
-                          "No description is available for this audit event."}
-                      </p>
-                    </div>
-
-                    <div
-                      className="admin-crud__chips"
-                      style={{ marginTop: 12 }}
+              {loadingLogs ? (
+                <div className="asc2-empty-box">Loading audit logs...</div>
+              ) : auditError ? (
+                <div className="asc2-empty-box">{auditError}</div>
+              ) : latestLogs.length ? (
+                <div className="asc2-compact-list">
+                  {latestLogs.map((log, index) => (
+                    <article
+                      key={log?._id || `${log?.action}-${index}`}
+                      className="asc2-compact-row"
                     >
-                      <span className="admin-crud__chip">
-                        <Clock3 size={14} />
-                        Recorded event
-                      </span>
-                    </div>
-                  </div>
-                </article>
-              ))}
+                      <div className="asc2-compact-icon">
+                        <Activity size={16} />
+                      </div>
+
+                      <div>
+                        <h4>{log?.action || "System action"}</h4>
+                        <p>
+                          {getActorName(log)} • {formatDateTime(log?.createdAt)}
+                        </p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="asc2-empty-box">No audit logs found.</div>
+              )}
+            </section>
+
+            <section className="asc2-panel-card">
+              <div className="asc2-panel-header">
+                <div>
+                  <h3>Current chat blocks</h3>
+                  <span>Users restricted from public chat</span>
+                </div>
+
+                <button
+                  type="button"
+                  className="adm-secondary-btn"
+                  onClick={() => setActiveTab("blockedChat")}
+                >
+                  Open Blocks
+                </button>
+              </div>
+
+              {loadingBlockedUsers ? (
+                <div className="asc2-empty-box">Loading blocked users...</div>
+              ) : latestBlocks.length ? (
+                <div className="asc2-compact-list">
+                  {latestBlocks.map((block) => (
+                    <article key={block?._id} className="asc2-compact-row">
+                      <div className="asc2-compact-icon asc2-compact-icon--danger">
+                        <Ban size={16} />
+                      </div>
+
+                      <div>
+                        <h4>{block?.userId?.fullName || "Blocked user"}</h4>
+                        <p>
+                          {block?.reason || "No reason"} •{" "}
+                          {formatDateTime(block?.createdAt)}
+                        </p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="asc2-empty-box">
+                  No blocked chat users right now.
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "audit" && (
+        <div className="asc2-tab-panel">
+          <section className="asc2-panel-card">
+            <div className="asc2-panel-header">
+              <div>
+                <h3>Audit logs</h3>
+                <span>{auditTotal} audit event(s)</span>
+              </div>
             </div>
-          )}
+
+            <form className="asc2-filter-bar" onSubmit={handleAuditSearch}>
+              <label className="asc2-search-box">
+                <Search size={16} />
+                <input
+                  type="text"
+                  placeholder="Search action, actor, role, target, reason"
+                  value={auditSearch}
+                  onChange={(event) => setAuditSearch(event.target.value)}
+                />
+              </label>
+
+              <button
+                type="submit"
+                className="adm-secondary-btn"
+                disabled={loadingLogs}
+              >
+                Search
+              </button>
+            </form>
+
+            {loadingLogs ? (
+              <div className="asc2-empty-box asc2-empty-box--large">
+                Loading audit logs...
+              </div>
+            ) : auditError ? (
+              <div className="asc2-empty-box asc2-empty-box--large">
+                {auditError}
+              </div>
+            ) : logs.length ? (
+              <div className="asc2-audit-list">
+                {logs.map((log, index) => (
+                  <AuditLogCard
+                    key={log?._id || `${log?.action}-${index}`}
+                    log={log}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="asc2-empty-box asc2-empty-box--large">
+                No audit log entries found.
+              </div>
+            )}
+
+            {auditPagination && auditTotalPages > 1 ? (
+              <div className="asc2-pagination">
+                <button
+                  type="button"
+                  className="adm-secondary-btn"
+                  onClick={() => loadLogs(Math.max(auditCurrentPage - 1, 1))}
+                  disabled={!auditPagination.hasPrevPage || loadingLogs}
+                >
+                  Previous
+                </button>
+
+                <span>
+                  Page {auditCurrentPage} of {auditTotalPages}
+                </span>
+
+                <button
+                  type="button"
+                  className="adm-primary-btn"
+                  onClick={() =>
+                    loadLogs(Math.min(auditCurrentPage + 1, auditTotalPages))
+                  }
+                  disabled={!auditPagination.hasNextPage || loadingLogs}
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
+          </section>
         </div>
       )}
 
       {activeTab === "blockedChat" && (
-        <div className="admin-crud__panel">
-          <div className="admin-crud__toolbar">
-            <div className="admin-crud__toolbar-left">
-              <h3 style={{ margin: 0 }}>Blocked public chat users</h3>
-              <span className="admin-crud__meta">
-                {blockedPagination?.totalItems ?? blockedUsers.length} blocked
-              </span>
-            </div>
+        <div className="asc2-tab-panel">
+          <section className="asc2-panel-card">
+            <div className="asc2-panel-header">
+              <div>
+                <h3>Blocked public chat users</h3>
+                <span>{blockedTotal} active block(s)</span>
+              </div>
 
-            <div className="admin-crud__toolbar-right">
               <button
                 type="button"
-                className="btn-secondary"
+                className="adm-secondary-btn"
                 onClick={() => loadBlockedUsers(blockedPage)}
                 disabled={loadingBlockedUsers}
               >
                 <RefreshCw size={15} />
-                {loadingBlockedUsers ? "Refreshing..." : "Refresh"}
+                Refresh
               </button>
             </div>
-          </div>
 
-          {loadingBlockedUsers ? (
-            <div className="admin-crud__empty">
-              <p>Loading blocked users...</p>
-            </div>
-          ) : blockedUsers.length === 0 ? (
-            <div className="asc-empty-state">
-              <UserRoundX size={34} />
-              <h3>No blocked users</h3>
-              <p>
-                Public chat is currently open for all users. Blocked users will
-                appear here after admin moderation.
-              </p>
-            </div>
-          ) : (
-            <div className="asc-blocked-grid">
-              {blockedUsers.map((block) => {
-                const blockedUser = block?.userId || {};
-                const blockedBy = block?.blockedBy || {};
-                const initials = getInitials(blockedUser?.fullName || "User");
+            {loadingBlockedUsers ? (
+              <div className="asc2-empty-box asc2-empty-box--large">
+                Loading blocked users...
+              </div>
+            ) : blockedUsers.length ? (
+              <div className="asc2-block-grid">
+                {blockedUsers.map((block) => (
+                  <BlockedUserCard
+                    key={block?._id}
+                    block={block}
+                    unblockingUserId={unblockingUserId}
+                    onUnblock={handleUnblockUser}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="asc2-empty-state">
+                <UserRoundX size={34} />
+                <h3>No blocked users</h3>
+                <p>
+                  Public chat is open for all users. Blocked users will appear
+                  here after admin moderation.
+                </p>
+              </div>
+            )}
 
-                return (
-                  <article key={block._id} className="asc-blocked-card">
-                    <div className="asc-blocked-card__top">
-                      <div className="asc-blocked-card__avatar">
-                        {blockedUser?.profilePhotoUrl ? (
-                          <img
-                            src={blockedUser.profilePhotoUrl}
-                            alt={blockedUser.fullName || "Blocked user"}
-                          />
-                        ) : (
-                          <span>{initials}</span>
-                        )}
-                      </div>
+            {blockedPagination && blockTotalPages > 1 ? (
+              <div className="asc2-pagination">
+                <button
+                  type="button"
+                  className="adm-secondary-btn"
+                  onClick={() =>
+                    loadBlockedUsers(Math.max(blockCurrentPage - 1, 1))
+                  }
+                  disabled={
+                    !blockedPagination.hasPrevPage || loadingBlockedUsers
+                  }
+                >
+                  Previous
+                </button>
 
-                      <div>
-                        <h4>{blockedUser?.fullName || "Blocked user"}</h4>
-                        <p>{blockedUser?.email || "No email available"}</p>
-                      </div>
+                <span>
+                  Page {blockCurrentPage} of {blockTotalPages}
+                </span>
 
-                      <span className="asc-blocked-card__badge">
-                        <Ban size={13} />
-                        Blocked
-                      </span>
-                    </div>
-
-                    <div className="asc-blocked-card__meta">
-                      <div>
-                        <span>Role</span>
-                        <strong>{blockedUser?.role || "-"}</strong>
-                      </div>
-
-                      <div>
-                        <span>Blocked by</span>
-                        <strong>{blockedBy?.fullName || "Admin"}</strong>
-                      </div>
-
-                      <div>
-                        <span>Blocked at</span>
-                        <strong>{formatDateTime(block?.createdAt)}</strong>
-                      </div>
-                    </div>
-
-                    <div className="asc-blocked-card__reason">
-                      <MessageCircle size={15} />
-                      <div>
-                        <strong>Reason</strong>
-                        <p>
-                          {block?.reason ||
-                            "No reason was provided by the administrator."}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="asc-blocked-card__actions">
-                      <button
-                        type="button"
-                        className="btn-primary"
-                        onClick={() => handleUnblockUser(block)}
-                        disabled={unblockingUserId === blockedUser?._id}
-                      >
-                        <Unlock size={15} />
-                        {unblockingUserId === blockedUser?._id
-                          ? "Unblocking..."
-                          : "Unblock User"}
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-
-          {blockedPagination && blockedPagination.totalPages > 1 ? (
-            <div className="asc-pagination">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => setBlockedPage((page) => Math.max(page - 1, 1))}
-                disabled={!blockedPagination.hasPrevPage}
-              >
-                Previous
-              </button>
-
-              <span>
-                Page {blockedPagination.currentPage} of{" "}
-                {blockedPagination.totalPages}
-              </span>
-
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() =>
-                  setBlockedPage((page) =>
-                    Math.min(page + 1, blockedPagination.totalPages),
-                  )
-                }
-                disabled={!blockedPagination.hasNextPage}
-              >
-                Next
-              </button>
-            </div>
-          ) : null}
+                <button
+                  type="button"
+                  className="adm-primary-btn"
+                  onClick={() =>
+                    loadBlockedUsers(
+                      Math.min(blockCurrentPage + 1, blockTotalPages),
+                    )
+                  }
+                  disabled={
+                    !blockedPagination.hasNextPage || loadingBlockedUsers
+                  }
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
+          </section>
         </div>
       )}
     </section>
