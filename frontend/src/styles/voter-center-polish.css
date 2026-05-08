@@ -1,0 +1,854 @@
+/* 
+  FINAL VOTER CENTER POLISH
+  Purpose:
+  - Bell dropdown clean layout
+  - System/Public Chat tabs clean
+  - Chat input/send button never overflow
+  - Mobile bell visibility fix
+  - Notification delete button clean
+  - Public chat real chat feel
+*/
+
+.voter-topbar-clean,
+.voter-topbar-clean__right {
+  overflow: visible !important;
+}
+
+.voter-notification-wrap {
+  position: relative !important;
+  display: inline-flex !important;
+  flex-shrink: 0 !important;
+  overflow: visible !important;
+  z-index: 100 !important;
+}
+
+.voter-topbar-clean__notification,
+.voter-notification-button {
+  position: relative !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  display: grid !important;
+  place-items: center !important;
+  flex-shrink: 0 !important;
+  overflow: visible !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.voter-notification-button__badge {
+  position: absolute !important;
+  top: -6px !important;
+  right: -6px !important;
+  min-width: 19px !important;
+  height: 19px !important;
+  padding: 0 5px !important;
+  border-radius: 999px !important;
+  background: #ba3545 !important;
+  color: #ffffff !important;
+  border: 2px solid #ffffff !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  z-index: 5 !important;
+}
+
+/* DROPDOWN */
+
+.voter-notification-dropdown,
+.voter-notification-dropdown--wide {
+  position: absolute !important;
+  top: calc(100% + 12px) !important;
+  right: 0 !important;
+  width: min(480px, calc(100vw - 24px)) !important;
+  max-width: calc(100vw - 24px) !important;
+  max-height: calc(100vh - 96px) !important;
+  border-radius: 24px !important;
+  background: #ffffff !important;
+  border: 1px solid #e4d8c8 !important;
+  box-shadow: 0 24px 60px rgba(61, 48, 35, 0.18) !important;
+  overflow: hidden !important;
+  z-index: 999 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
+}
+
+.voter-notification-dropdown__header {
+  flex-shrink: 0 !important;
+  padding: 14px !important;
+  background: #fbf7f0 !important;
+  border-bottom: 1px solid #eee2d3 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+}
+
+.voter-notification-dropdown__header strong {
+  display: block !important;
+  color: #17211b !important;
+  font-size: 15px !important;
+  font-weight: 900 !important;
+}
+
+.voter-notification-dropdown__header span {
+  display: block !important;
+  margin-top: 3px !important;
+  color: #667085 !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+.voter-notification-header-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+}
+
+.voter-notification-header-actions button,
+.voter-notification-dropdown__header > button {
+  border: 0 !important;
+  background: transparent !important;
+  color: #247a52 !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  padding: 0 !important;
+}
+
+.voter-notification-header-actions button:disabled,
+.voter-notification-dropdown__header > button:disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+}
+
+/* SYSTEM / CHAT SWITCH */
+
+.voter-bell-tabs {
+  flex-shrink: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 0 !important;
+  padding: 6px !important;
+  margin: 10px !important;
+  border-radius: 18px !important;
+  background: #f4efe6 !important;
+  border: 1px solid #e4d8c8 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72) !important;
+}
+
+.voter-bell-tabs button {
+  min-width: 0 !important;
+  min-height: 42px !important;
+  padding: 0 12px !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: transparent !important;
+  color: #6b645b !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease !important;
+}
+
+.voter-bell-tabs button:hover {
+  color: #247a52 !important;
+  background: rgba(255, 255, 255, 0.45) !important;
+}
+
+.voter-bell-tabs button.is-active {
+  color: #17211b !important;
+  background: #ffffff !important;
+  box-shadow:
+    0 8px 18px rgba(61, 48, 35, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+.voter-bell-tabs button svg {
+  flex-shrink: 0 !important;
+}
+
+.voter-bell-tabs button span {
+  min-width: 19px !important;
+  height: 19px !important;
+  padding: 0 6px !important;
+  border-radius: 999px !important;
+  background: #ba3545 !important;
+  color: #ffffff !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+}
+
+/* SYSTEM NOTIFICATIONS */
+
+.voter-notification-dropdown__body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 10px !important;
+}
+
+.voter-notification-dropdown__body a {
+  display: block !important;
+  text-decoration: none !important;
+}
+
+.voter-notification-plain-button {
+  width: 100% !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.voter-notification-item {
+  position: relative !important;
+  display: grid !important;
+  grid-template-columns: 10px minmax(0, 1fr) !important;
+  gap: 10px !important;
+  padding: 12px !important;
+  border-radius: 16px !important;
+  border: 1px solid transparent !important;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease !important;
+}
+
+.voter-notification-item--with-action {
+  grid-template-columns: 10px minmax(0, 1fr) 34px !important;
+  align-items: start !important;
+}
+
+.voter-notification-item:hover {
+  transform: translateY(-1px) !important;
+  background: #fbf7f0 !important;
+  border-color: #eee2d3 !important;
+}
+
+.voter-notification-item--unread {
+  background: #f8fff9 !important;
+  border-color: #c8ead4 !important;
+}
+
+.voter-notification-item__dot {
+  width: 9px !important;
+  height: 9px !important;
+  margin-top: 6px !important;
+  border-radius: 999px !important;
+  background: #667085 !important;
+}
+
+.voter-notification-item--success .voter-notification-item__dot {
+  background: #247a52 !important;
+}
+
+.voter-notification-item--warning .voter-notification-item__dot {
+  background: #a46315 !important;
+}
+
+.voter-notification-item--danger .voter-notification-item__dot {
+  background: #ba3545 !important;
+}
+
+.voter-notification-item--info .voter-notification-item__dot {
+  background: #6750a4 !important;
+}
+
+.voter-notification-item h4 {
+  margin: 0 !important;
+  color: #17211b !important;
+  font-size: 13px !important;
+  line-height: 1.35 !important;
+  font-weight: 900 !important;
+}
+
+.voter-notification-item p {
+  margin: 5px 0 0 !important;
+  color: #5f6670 !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+.voter-notification-item__meta {
+  margin-top: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+}
+
+.voter-notification-item__meta span {
+  color: #786b60 !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+.voter-notification-item__meta strong {
+  color: #247a52 !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  white-space: nowrap !important;
+}
+
+.voter-notification-delete-btn {
+  width: 32px !important;
+  height: 32px !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #ffe4e9 !important;
+  color: #ba3545 !important;
+  display: grid !important;
+  place-items: center !important;
+  cursor: pointer !important;
+  transition:
+    transform 160ms ease,
+    background 160ms ease !important;
+}
+
+.voter-notification-delete-btn:hover:not(:disabled) {
+  background: #ffd3dc !important;
+  transform: translateY(-1px) !important;
+}
+
+.voter-notification-delete-btn:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+.voter-notification-empty {
+  min-height: 130px !important;
+  display: grid !important;
+  place-items: center !important;
+  color: #667085 !important;
+  text-align: center !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+/* PUBLIC CHAT */
+
+.voter-chat-panel {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 460px !important;
+  max-height: calc(100vh - 235px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  background:
+    radial-gradient(
+      circle at 15% 10%,
+      rgba(226, 246, 234, 0.65),
+      transparent 22%
+    ),
+    radial-gradient(
+      circle at 90% 0%,
+      rgba(255, 240, 207, 0.75),
+      transparent 25%
+    ),
+    #fffdf8 !important;
+}
+
+.voter-chat-panel__body {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 16px 14px !important;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.55)),
+    repeating-linear-gradient(
+      135deg,
+      rgba(36, 122, 82, 0.025) 0,
+      rgba(36, 122, 82, 0.025) 8px,
+      rgba(255, 255, 255, 0.02) 8px,
+      rgba(255, 255, 255, 0.02) 16px
+    ) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #d6c8b6 transparent !important;
+}
+
+.voter-chat-panel__body::-webkit-scrollbar {
+  width: 7px !important;
+}
+
+.voter-chat-panel__body::-webkit-scrollbar-thumb {
+  background: #d6c8b6 !important;
+  border-radius: 999px !important;
+}
+
+.voter-chat-message {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: 38px minmax(0, 1fr) !important;
+  align-items: flex-end !important;
+  gap: 9px !important;
+}
+
+.voter-chat-message--mine {
+  grid-template-columns: minmax(0, 1fr) 38px !important;
+}
+
+.voter-chat-message--mine .voter-chat-message__avatar {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+}
+
+.voter-chat-message--mine .voter-chat-message__bubble {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  justify-self: end !important;
+  background: linear-gradient(135deg, #247a52, #2f9d68) !important;
+  border-color: #247a52 !important;
+  color: #ffffff !important;
+  border-bottom-right-radius: 6px !important;
+}
+
+.voter-chat-message:not(.voter-chat-message--mine) .voter-chat-message__bubble {
+  justify-self: start !important;
+  border-bottom-left-radius: 6px !important;
+}
+
+.voter-chat-message__avatar {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  display: grid !important;
+  place-items: center !important;
+  background: linear-gradient(135deg, #247a52, #6750a4) !important;
+  color: #ffffff !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  box-shadow: 0 8px 18px rgba(61, 48, 35, 0.12) !important;
+}
+
+.voter-chat-message__avatar img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+.voter-chat-message__bubble {
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  max-width: min(330px, calc(100% - 4px)) !important;
+  padding: 10px 12px 9px !important;
+  border-radius: 18px !important;
+  background: #ffffff !important;
+  border: 1px solid #eee2d3 !important;
+  box-shadow: 0 8px 22px rgba(61, 48, 35, 0.07) !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+.voter-chat-message__top {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  margin-bottom: 5px !important;
+}
+
+.voter-chat-message__top strong {
+  min-width: 0 !important;
+  color: #17211b !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.voter-chat-message__top span {
+  color: #786b60 !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  white-space: nowrap !important;
+}
+
+.voter-chat-message__bubble p {
+  margin: 0 !important;
+  color: #34403a !important;
+  font-size: 13px !important;
+  line-height: 1.48 !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+.voter-chat-message--mine .voter-chat-message__top strong,
+.voter-chat-message--mine .voter-chat-message__top span,
+.voter-chat-message--mine .voter-chat-message__bubble p {
+  color: #ffffff !important;
+}
+
+.voter-chat-message--mine .voter-chat-message__top span {
+  opacity: 0.78 !important;
+}
+
+/* CHAT FORM */
+
+.voter-chat-form {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  flex-shrink: 0 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) max-content !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 10px !important;
+  overflow: hidden !important;
+  border-top: 1px solid #eee2d3 !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+}
+
+.voter-chat-form input {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: 44px !important;
+  padding: 0 14px !important;
+  border: 1px solid #e4d8c8 !important;
+  border-radius: 999px !important;
+  background: #fbf7f0 !important;
+  color: #17211b !important;
+  outline: none !important;
+  font-weight: 800 !important;
+}
+
+.voter-chat-form input::placeholder {
+  color: #93877a !important;
+}
+
+.voter-chat-form input:focus {
+  border-color: #bce7cb !important;
+  background: #ffffff !important;
+  box-shadow: 0 0 0 4px rgba(36, 122, 82, 0.1) !important;
+}
+
+.voter-chat-form button {
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+  width: auto !important;
+  min-width: 82px !important;
+  max-width: 96px !important;
+  height: 44px !important;
+  padding: 0 12px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: #247a52 !important;
+  color: #ffffff !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  box-shadow: 0 10px 22px rgba(36, 122, 82, 0.2) !important;
+}
+
+.voter-chat-form button:hover:not(:disabled) {
+  background: #1e6846 !important;
+  transform: translateY(-1px) !important;
+}
+
+.voter-chat-form button:disabled {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+}
+
+.voter-chat-blocked-box {
+  flex-shrink: 0 !important;
+  margin: 12px !important;
+  padding: 13px !important;
+  border-radius: 16px !important;
+  background: #ffe4e9 !important;
+  border: 1px solid #f5b8c4 !important;
+  color: #ba3545 !important;
+}
+
+.voter-chat-blocked-box strong {
+  display: block !important;
+  font-size: 13px !important;
+}
+
+.voter-chat-blocked-box p {
+  margin: 5px 0 0 !important;
+  color: #8f2633 !important;
+  line-height: 1.5 !important;
+  font-size: 12px !important;
+}
+
+.voter-notification-dropdown__footer {
+  flex-shrink: 0 !important;
+  padding: 13px 14px !important;
+  background: #fbf7f0 !important;
+  border-top: 1px solid #eee2d3 !important;
+  text-align: center !important;
+}
+
+.voter-notification-dropdown__footer a {
+  color: #247a52 !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+}
+
+.voter-notification-dropdown__footer span {
+  color: #667085 !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+/* MOBILE */
+
+@media (max-width: 760px) {
+  .voter-topbar-clean__right {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 40px 40px !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  .voter-topbar-clean__status {
+    min-width: 0 !important;
+    width: auto !important;
+    overflow-x: auto !important;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+    scrollbar-width: none !important;
+  }
+
+  .voter-topbar-clean__status::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .voter-topbar-clean__chip {
+    flex-shrink: 0 !important;
+  }
+
+  .voter-notification-wrap {
+    order: initial !important;
+    justify-self: center !important;
+  }
+
+  .voter-topbar-clean__profile {
+    min-width: 0 !important;
+    justify-self: end !important;
+    border-left: 0 !important;
+    padding-left: 0 !important;
+  }
+
+  .voter-topbar-clean__profile > div:last-child {
+    display: none !important;
+  }
+
+  .voter-notification-dropdown,
+  .voter-notification-dropdown--wide {
+    position: fixed !important;
+    top: 88px !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: calc(100vh - 104px) !important;
+  }
+
+  .voter-chat-panel {
+    min-height: 400px !important;
+    max-height: calc(100vh - 250px) !important;
+  }
+
+  .voter-chat-form {
+    grid-template-columns: minmax(0, 1fr) 46px !important;
+    gap: 8px !important;
+    padding: 9px !important;
+  }
+
+  .voter-chat-form button {
+    width: 46px !important;
+    min-width: 46px !important;
+    max-width: 46px !important;
+    height: 44px !important;
+    padding: 0 !important;
+    border-radius: 999px !important;
+    font-size: 0 !important;
+  }
+
+  .voter-chat-form button svg {
+    width: 17px !important;
+    height: 17px !important;
+  }
+
+  .voter-chat-message__bubble {
+    max-width: min(280px, calc(100% - 4px)) !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .voter-notification-dropdown,
+  .voter-notification-dropdown--wide {
+    top: 96px !important;
+    left: 10px !important;
+    right: 10px !important;
+    border-radius: 20px !important;
+  }
+
+  .voter-notification-dropdown__header {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+
+  .voter-notification-header-actions {
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
+
+  .voter-bell-tabs {
+    margin: 8px !important;
+    padding: 5px !important;
+    border-radius: 16px !important;
+  }
+
+  .voter-bell-tabs button {
+    min-height: 40px !important;
+    padding: 0 8px !important;
+    gap: 5px !important;
+    font-size: 11px !important;
+  }
+
+  .voter-chat-panel {
+    min-height: 380px !important;
+    max-height: calc(100vh - 260px) !important;
+  }
+
+  .voter-chat-panel__body {
+    padding: 12px 9px !important;
+  }
+
+  .voter-chat-message {
+    grid-template-columns: 32px minmax(0, 1fr) !important;
+    gap: 7px !important;
+  }
+
+  .voter-chat-message--mine {
+    grid-template-columns: minmax(0, 1fr) 32px !important;
+  }
+
+  .voter-chat-message__avatar {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 12px !important;
+  }
+
+  .voter-chat-message__bubble {
+    max-width: min(245px, calc(100% - 2px)) !important;
+    padding: 9px 10px !important;
+  }
+
+  .voter-chat-form {
+    grid-template-columns: minmax(0, 1fr) 44px !important;
+    padding: 8px !important;
+  }
+
+  .voter-chat-form input {
+    height: 42px !important;
+    padding: 0 12px !important;
+  }
+
+  .voter-chat-form button {
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 42px !important;
+  }
+
+  .voter-notification-item--with-action {
+    grid-template-columns: 9px minmax(0, 1fr) 30px !important;
+  }
+
+  .voter-notification-delete-btn {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 11px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .voter-chat-message__bubble {
+    max-width: min(220px, calc(100% - 2px)) !important;
+  }
+
+  .voter-chat-form {
+    grid-template-columns: minmax(0, 1fr) 42px !important;
+  }
+
+  .voter-chat-form button {
+    width: 42px !important;
+    min-width: 42px !important;
+    max-width: 42px !important;
+  }
+}
+/* PUBLIC CHAT LIVE STATUS */
+
+.voter-chat-live-status {
+  flex-shrink: 0 !important;
+  min-height: 34px !important;
+  padding: 8px 12px !important;
+  background: #fbf7f0 !important;
+  border-bottom: 1px solid #eee2d3 !important;
+  color: #247a52 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+}
+
+.voter-chat-live-status svg {
+  flex-shrink: 0 !important;
+}

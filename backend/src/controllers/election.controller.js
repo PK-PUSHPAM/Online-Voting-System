@@ -10,7 +10,7 @@ import syncElectionStatus from "../utils/syncElectionStatus.js";
 import getElectionStatus from "../utils/getElectionStatus.js";
 import { buildPagination } from "../utils/pagination.util.js";
 import { buildPaginationResponse } from "../utils/paginationResponse.util.js";
-
+import { createElectionNotificationsForVisibleVoters } from "../services/systemNotification.service.js";
 const getClientIp = (req) => {
   return (
     req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
@@ -92,6 +92,18 @@ export const createElection = asyncHandler(async (req, res) => {
     isPublished: isPublished ?? false,
     allowedVoterType: allowedVoterType || "verifiedOnly",
   });
+
+  if (election.isPublished) {
+    await createElectionNotificationsForVisibleVoters({
+      election,
+      title: "New election published",
+      message: `${election.title} has been published. You can view election details, posts, and candidates.`,
+      type: election.status === "active" ? "success" : "info",
+      link: `/voter/elections/${election._id}`,
+      createdBy: req.user._id,
+      source: "election",
+    });
+  }
 
   await createAuditLog({
     req,
@@ -197,6 +209,8 @@ export const updateElection = asyncHandler(async (req, res) => {
   } = body;
 
   const election = await Election.findById(electionId);
+  const wasPublishedBeforeUpdate = Boolean(election.isPublished);
+  const previousStatus = election.status;
 
   if (!election) {
     throw new ApiError(404, "Election not found");
@@ -278,6 +292,29 @@ export const updateElection = asyncHandler(async (req, res) => {
 
   await election.save();
 
+  const becamePublished =
+    !wasPublishedBeforeUpdate && Boolean(election.isPublished);
+
+  const becameActive =
+    previousStatus !== "active" && election.status === "active";
+
+  if (becamePublished || becameActive) {
+    await createElectionNotificationsForVisibleVoters({
+      election,
+      title:
+        election.status === "active"
+          ? "Election is active now"
+          : "Election published",
+      message:
+        election.status === "active"
+          ? `${election.title} is now active. You can vote if your profile is eligible.`
+          : `${election.title} has been published. You can preview posts and candidates.`,
+      type: election.status === "active" ? "success" : "info",
+      link: `/voter/elections/${election._id}`,
+      createdBy: req.user._id,
+      source: "election",
+    });
+  }
   const syncedElection = await syncElectionStatus(election);
 
   await createAuditLog({

@@ -34,4 +34,16 @@ export const systemNotificationService = {
     const response = await apiClient.patch("/notifications/mark-all-read");
     return extractData(response);
   },
+
+  async deleteNotification(notificationId) {
+    if (!notificationId) return {};
+
+    const response = await apiClient.delete(`/notifications/${notificationId}`);
+    return extractData(response);
+  },
+
+  async clearReadNotifications() {
+    const response = await apiClient.delete("/notifications/clear-read");
+    return extractData(response);
+  },
 };

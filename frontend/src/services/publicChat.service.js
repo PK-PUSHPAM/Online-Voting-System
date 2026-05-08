@@ -1,4 +1,5 @@
 import apiClient from "../lib/apiClient";
+import { API_BASE_URL } from "../lib/env";
 
 const extractData = (response) => response?.data?.data || {};
 
@@ -70,5 +71,36 @@ export const publicChatService = {
     });
 
     return extractData(response);
+  },
+
+  createPublicChatStream({ onEvent, onError, onOpen } = {}) {
+    if (typeof window === "undefined" || typeof EventSource === "undefined") {
+      return null;
+    }
+
+    const streamUrl = `${API_BASE_URL}/chat/public/stream`;
+
+    const eventSource = new EventSource(streamUrl, {
+      withCredentials: true,
+    });
+
+    eventSource.addEventListener("open", () => {
+      onOpen?.();
+    });
+
+    eventSource.addEventListener("public_chat_event", (event) => {
+      try {
+        const parsedEvent = JSON.parse(event.data);
+        onEvent?.(parsedEvent);
+      } catch (error) {
+        console.warn(`Failed to parse public chat event: ${error.message}`);
+      }
+    });
+
+    eventSource.addEventListener("error", (error) => {
+      onError?.(error);
+    });
+
+    return eventSource;
   },
 };

@@ -44,6 +44,53 @@ const validateVoterEligibility = (voter, election) => {
   }
 };
 
+const buildMyVotesSummary = async ({ voterId, electionId }) => {
+  if (!electionId) {
+    return {
+      totalVotes: 0,
+      totalPostsVoted: 0,
+      postVoteSummary: [],
+    };
+  }
+
+  const voterObjectId = new mongoose.Types.ObjectId(String(voterId));
+  const electionObjectId = new mongoose.Types.ObjectId(String(electionId));
+
+  const postVoteSummary = await Vote.aggregate([
+    {
+      $match: {
+        voterId: voterObjectId,
+        electionId: electionObjectId,
+      },
+    },
+    {
+      $group: {
+        _id: "$postId",
+        count: { $sum: 1 },
+        candidateIds: { $addToSet: "$candidateId" },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        postId: "$_id",
+        count: 1,
+        candidateIds: 1,
+      },
+    },
+  ]);
+
+  const totalVotes = postVoteSummary.reduce((sum, item) => {
+    return sum + Number(item.count || 0);
+  }, 0);
+
+  return {
+    totalVotes,
+    totalPostsVoted: postVoteSummary.length,
+    postVoteSummary,
+  };
+};
+
 export const castVote = asyncHandler(async (req, res) => {
   const voterId = req.user._id;
   const { body } = req.validatedData || { body: req.body };
@@ -180,15 +227,27 @@ export const getMyVotes = asyncHandler(async (req, res) => {
   const { query } = req.validatedData || { query: req.query };
   const { page, limit, skip, sort } = buildPagination(query);
 
-  const [totalItems, votes] = await Promise.all([
-    Vote.countDocuments({ voterId }),
-    Vote.find({ voterId })
+  const filter = {
+    voterId,
+  };
+
+  if (query.electionId) {
+    filter.electionId = query.electionId;
+  }
+
+  const [totalItems, votes, summary] = await Promise.all([
+    Vote.countDocuments(filter),
+    Vote.find(filter)
       .populate("electionId", "title status startDate endDate isPublished")
       .populate("postId", "title description maxVotesPerVoter")
       .populate("candidateId", "fullName partyName candidatePhotoUrl")
       .sort(sort)
       .skip(skip)
       .limit(limit),
+    buildMyVotesSummary({
+      voterId,
+      electionId: query.electionId,
+    }),
   ]);
 
   const pagination = buildPaginationResponse({
@@ -197,15 +256,25 @@ export const getMyVotes = asyncHandler(async (req, res) => {
     limit,
   });
 
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        { items: votes, pagination },
-        "Your votes fetched successfully",
-      ),
-    );
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        items: votes,
+        pagination,
+        summary: query.electionId
+          ? summary
+          : {
+              totalVotes: totalItems,
+              totalPostsVoted: 0,
+              postVoteSummary: [],
+            },
+      },
+      query.electionId
+        ? "Your election votes fetched successfully"
+        : "Your votes fetched successfully",
+    ),
+  );
 });
 
 export const getVotesByElectionForAdmin = asyncHandler(async (req, res) => {

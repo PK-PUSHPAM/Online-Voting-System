@@ -6,12 +6,16 @@ import {
   getMySystemNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  deleteMyNotification,
+  clearMyReadNotifications,
   createAdminSystemNotification,
 } from "../controllers/notification.controller.js";
 import {
   getMySystemNotificationsSchema,
   markNotificationAsReadSchema,
   markAllNotificationsAsReadSchema,
+  deleteMyNotificationSchema,
+  clearMyReadNotificationsSchema,
   createAdminSystemNotificationSchema,
 } from "../validations/notification.validation.js";
 
@@ -31,11 +35,25 @@ router.patch(
   markAllNotificationsAsRead,
 );
 
+router.delete(
+  "/clear-read",
+  verifyJWT,
+  validate(clearMyReadNotificationsSchema),
+  clearMyReadNotifications,
+);
+
 router.patch(
   "/:notificationId/read",
   verifyJWT,
   validate(markNotificationAsReadSchema),
   markNotificationAsRead,
+);
+
+router.delete(
+  "/:notificationId",
+  verifyJWT,
+  validate(deleteMyNotificationSchema),
+  deleteMyNotification,
 );
 
 router.post(

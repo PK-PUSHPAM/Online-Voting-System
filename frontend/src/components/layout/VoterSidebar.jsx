@@ -13,6 +13,12 @@ import {
   ShieldCheck,
   Vote,
   X,
+  CheckCircle2,
+  Trophy,
+  Sparkles,
+  UserCircle2,
+  Clock3,
+  XCircle,
 } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { APP_ROUTES } from "../../lib/routes";
@@ -220,6 +226,13 @@ export default function VoterSidebar({
                   to={APP_ROUTES.VOTER_MY_VOTES}
                   icon={FileCheck2}
                   label="My Votes"
+                  onNavigate={handleNavigate}
+                  isCollapsed={isDesktopCollapsed}
+                />
+                <SidebarLink
+                  to={APP_ROUTES.VOTER_RESULTS}
+                  icon={Trophy}
+                  label="Results"
                   onNavigate={handleNavigate}
                   isCollapsed={isDesktopCollapsed}
                 />

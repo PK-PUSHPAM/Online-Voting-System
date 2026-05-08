@@ -30,6 +30,12 @@ const tabs = [
   { id: "myVotes", label: "My Votes" },
 ];
 
+const emptyVoteSummary = {
+  totalVotes: 0,
+  totalPostsVoted: 0,
+  postVoteSummary: [],
+};
+
 function formatDate(value) {
   if (!value) return "-";
 
@@ -151,116 +157,111 @@ export default function VoterElectionDetailsPage() {
   const [canVoteNow, setCanVoteNow] = useState(false);
   const [posts, setPosts] = useState([]);
   const [votes, setVotes] = useState([]);
+  const [votesPagination, setVotesPagination] = useState(null);
+  const [voteSummary, setVoteSummary] = useState(emptyVoteSummary);
 
   const readiness = useMemo(() => getReadiness(user), [user]);
 
-  const loadAllVotesForThisElection = useCallback(async () => {
-    const collectedVotes = [];
-    let page = 1;
-    let hasNextPage = true;
-
-    while (hasNextPage) {
-      const response = await voteService.getMyVotes({
-        page,
-        limit: VOTES_PAGE_LIMIT,
-      });
-
-      const items = Array.isArray(response?.items) ? response.items : [];
-
-      collectedVotes.push(
-        ...items.filter((vote) => vote?.electionId?._id === electionId),
-      );
-
-      hasNextPage = Boolean(response?.pagination?.hasNextPage);
-      page += 1;
-    }
-
-    return collectedVotes;
+  useEffect(() => {
+    setMyVotesPage(1);
   }, [electionId]);
 
-  const loadElectionPage = useCallback(async () => {
-    if (!electionId) return;
+  const loadElectionPage = useCallback(
+    async (pageToLoad = myVotesPage) => {
+      if (!electionId) return;
 
-    try {
-      setLoading(true);
+      try {
+        setLoading(true);
 
-      const [publishedElectionResponse, postCandidateResponse, electionVotes] =
-        await Promise.all([
+        const [
+          publishedElectionResponse,
+          postCandidateResponse,
+          electionVotesResponse,
+        ] = await Promise.all([
           voterService.getPublishedElections(),
           voterService.getElectionPostsWithCandidates(electionId),
-          loadAllVotesForThisElection(),
+          voteService.getMyVotes({
+            electionId,
+            page: pageToLoad,
+            limit: VOTES_PAGE_LIMIT,
+          }),
         ]);
 
-      const matchedElectionFromList =
-        Array.isArray(publishedElectionResponse?.elections) &&
-        publishedElectionResponse.elections.find(
-          (item) => item?._id === electionId,
+        const matchedElectionFromList =
+          Array.isArray(publishedElectionResponse?.elections) &&
+          publishedElectionResponse.elections.find(
+            (item) => item?._id === electionId,
+          );
+
+        const normalizedPosts = Array.isArray(postCandidateResponse?.posts)
+          ? postCandidateResponse.posts
+          : [];
+
+        setElection(
+          postCandidateResponse?.election || matchedElectionFromList || null,
         );
 
-      const normalizedPosts = Array.isArray(postCandidateResponse?.posts)
-        ? postCandidateResponse.posts
-        : [];
+        setCanVoteNow(Boolean(postCandidateResponse?.canVoteNow));
+        setPosts(normalizedPosts);
+        setVotes(
+          Array.isArray(electionVotesResponse?.items)
+            ? electionVotesResponse.items
+            : [],
+        );
+        setVotesPagination(electionVotesResponse?.pagination || null);
+        setVoteSummary(electionVotesResponse?.summary || emptyVoteSummary);
 
-      setElection(
-        postCandidateResponse?.election || matchedElectionFromList || null,
-      );
+        setActivePostId((currentPostId) => {
+          if (
+            currentPostId &&
+            normalizedPosts.some((post) => post?._id === currentPostId)
+          ) {
+            return currentPostId;
+          }
 
-      setCanVoteNow(Boolean(postCandidateResponse?.canVoteNow));
-      setPosts(normalizedPosts);
-      setVotes(electionVotes);
-
-      setActivePostId((currentPostId) => {
-        if (
-          currentPostId &&
-          normalizedPosts.some((post) => post?._id === currentPostId)
-        ) {
-          return currentPostId;
-        }
-
-        return normalizedPosts?.[0]?._id || "";
-      });
-
-      setMyVotesPage(1);
-    } catch (error) {
-      toast.error(getApiErrorMessage(error));
-      setElection(null);
-      setCanVoteNow(false);
-      setPosts([]);
-      setVotes([]);
-      setActivePostId("");
-      setMyVotesPage(1);
-    } finally {
-      setLoading(false);
-    }
-  }, [electionId, loadAllVotesForThisElection]);
+          return normalizedPosts?.[0]?._id || "";
+        });
+      } catch (error) {
+        toast.error(getApiErrorMessage(error));
+        setElection(null);
+        setCanVoteNow(false);
+        setPosts([]);
+        setVotes([]);
+        setVotesPagination(null);
+        setVoteSummary(emptyVoteSummary);
+        setActivePostId("");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [electionId, myVotesPage],
+  );
 
   useEffect(() => {
-    loadElectionPage();
-  }, [loadElectionPage]);
+    loadElectionPage(myVotesPage);
+  }, [loadElectionPage, myVotesPage]);
 
   const votesByPost = useMemo(() => {
     const map = new Map();
+    const postVoteSummary = Array.isArray(voteSummary?.postVoteSummary)
+      ? voteSummary.postVoteSummary
+      : [];
 
-    for (const vote of votes) {
-      const postId = vote?.postId?._id;
-      if (!postId) continue;
+    for (const item of postVoteSummary) {
+      if (!item?.postId) continue;
 
-      const existing = map.get(postId) || {
-        count: 0,
-        candidateIds: new Set(),
-      };
-
-      existing.count += 1;
-
-      if (vote?.candidateId?._id) {
-        existing.candidateIds.add(vote.candidateId._id);
-      }
-
-      map.set(postId, existing);
+      map.set(String(item.postId), {
+        count: Number(item.count || 0),
+        candidateIds: new Set(
+          Array.isArray(item.candidateIds)
+            ? item.candidateIds.map((candidateId) => String(candidateId))
+            : [],
+        ),
+      });
     }
 
     return map;
-  }, [votes]);
+  }, [voteSummary]);
 
   const activePost = useMemo(() => {
     return posts.find((post) => post?._id === activePostId) || posts[0] || null;
@@ -284,30 +285,29 @@ export default function VoterElectionDetailsPage() {
     if (!canVoteNow) return 0;
 
     return posts.reduce((sum, post) => {
-      const used = votesByPost.get(post._id)?.count || 0;
+      const used = votesByPost.get(String(post._id))?.count || 0;
       const maxVotes = Number(post?.maxVotesPerVoter || 1);
       return sum + Math.max(maxVotes - used, 0);
     }, 0);
   }, [canVoteNow, posts, votesByPost]);
 
   const myVotesPagination = useMemo(() => {
-    const totalItems = votes.length;
-    const totalPages = Math.max(Math.ceil(totalItems / VOTES_PAGE_LIMIT), 1);
-    const safePage = Math.min(Math.max(myVotesPage, 1), totalPages);
-    const startIndex = (safePage - 1) * VOTES_PAGE_LIMIT;
-    const endIndex = startIndex + VOTES_PAGE_LIMIT;
+    const currentPage = Number(
+      votesPagination?.currentPage || myVotesPage || 1,
+    );
+    const totalPages = Math.max(Number(votesPagination?.totalPages || 1), 1);
 
     return {
-      currentPage: safePage,
+      currentPage,
       totalPages,
-      hasPrevPage: safePage > 1,
-      hasNextPage: safePage < totalPages,
-      items: votes.slice(startIndex, endIndex),
+      hasPrevPage: Boolean(votesPagination?.hasPrevPage),
+      hasNextPage: Boolean(votesPagination?.hasNextPage),
+      items: votes,
     };
-  }, [myVotesPage, votes]);
+  }, [myVotesPage, votes, votesPagination]);
 
   const electionStatusLabel = formatLabel(election?.status || "upcoming");
-
+  const totalElectionVotes = Number(voteSummary?.totalVotes || 0);
   const canCastVoteInThisElection = readiness.canVote && canVoteNow;
 
   const votingStatusMessage = canVoteNow
@@ -330,14 +330,15 @@ export default function VoterElectionDetailsPage() {
     try {
       setSubmittingVoteId(buttonKey);
 
-      const response = await voteService.castVote({
+      await voteService.castVote({
         electionId,
         postId,
         candidateId,
       });
 
-      toast.success(response?.message || "Vote submitted successfully.");
-      await loadElectionPage();
+      toast.success("Vote submitted successfully.");
+      setMyVotesPage(1);
+      await loadElectionPage(1);
       setActiveTab("myVotes");
     } catch (error) {
       toast.error(getApiErrorMessage(error));
@@ -436,7 +437,7 @@ export default function VoterElectionDetailsPage() {
                 <article className="vcp-metric-card vcp-metric-card--amber">
                   <CheckCircle2 size={20} />
                   <span>Your Votes</span>
-                  <strong>{votes.length}</strong>
+                  <strong>{totalElectionVotes}</strong>
                 </article>
 
                 <article className="vcp-metric-card vcp-metric-card--rose">
@@ -521,7 +522,7 @@ export default function VoterElectionDetailsPage() {
 
                     <div className="vcp-post-options">
                       {posts.map((post) => {
-                        const voteData = votesByPost.get(post._id) || {
+                        const voteData = votesByPost.get(String(post._id)) || {
                           count: 0,
                         };
                         const maxVotes = Number(post?.maxVotesPerVoter || 1);
@@ -571,7 +572,7 @@ export default function VoterElectionDetailsPage() {
                       <CandidateGrid
                         post={activePost}
                         voteData={
-                          votesByPost.get(activePost._id) || {
+                          votesByPost.get(String(activePost._id)) || {
                             count: 0,
                             candidateIds: new Set(),
                           }
@@ -599,13 +600,13 @@ export default function VoterElectionDetailsPage() {
                   <div>
                     <h3>My votes in this election</h3>
                     <p>
-                      Showing {VOTES_PAGE_LIMIT} records per page for better
-                      performance and cleaner UI.
+                      Showing {VOTES_PAGE_LIMIT} records per page. Vote count
+                      summary is calculated from backend.
                     </p>
                   </div>
 
                   <span className="vcp-status-chip">
-                    {votes.length} recorded
+                    {totalElectionVotes} recorded
                   </span>
                 </div>
 
@@ -627,12 +628,14 @@ export default function VoterElectionDetailsPage() {
                 totalPages={myVotesPagination.totalPages}
                 hasPrevPage={myVotesPagination.hasPrevPage}
                 hasNextPage={myVotesPagination.hasNextPage}
-                onPrev={() => setMyVotesPage((page) => Math.max(page - 1, 1))}
-                onNext={() =>
+                onPrev={() => {
+                  setMyVotesPage((page) => Math.max(page - 1, 1));
+                }}
+                onNext={() => {
                   setMyVotesPage((page) =>
                     Math.min(page + 1, myVotesPagination.totalPages),
-                  )
-                }
+                  );
+                }}
               />
             </div>
           )}
@@ -667,7 +670,7 @@ function CandidateGrid({
     <div className="vcp-candidate-grid">
       {candidates.map((candidate) => {
         const alreadyVotedForCandidate = voteData?.candidateIds?.has(
-          candidate._id,
+          String(candidate._id),
         );
         const candidateApproved = getCandidateApproval(candidate);
 

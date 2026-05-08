@@ -437,11 +437,6 @@
   color: var(--voter-amber);
 }
 
-.voter-topbar-clean__chip--danger {
-  background: var(--voter-red-soft);
-  color: var(--voter-red);
-}
-
 .voter-topbar-clean__profile {
   gap: 10px;
   padding-left: 12px;
@@ -517,16 +512,6 @@
     linear-gradient(135deg, #ffe4d1, #fff9f1);
 }
 
-.voter-page-hero--mint {
-  background:
-    radial-gradient(
-      circle at top right,
-      rgba(255, 255, 255, 0.78),
-      transparent 40%
-    ),
-    linear-gradient(135deg, #dff7e9, #fbfff8);
-}
-
 .voter-eyebrow {
   display: inline-flex;
   margin-bottom: 10px;
@@ -586,11 +571,6 @@
 .voter-readiness-pill--warning {
   background: var(--voter-amber-soft);
   border-color: #efd196;
-}
-
-.voter-readiness-pill--danger {
-  background: var(--voter-red-soft);
-  border-color: #f5b8c4;
 }
 
 .voter-hero-count-box {
@@ -662,10 +642,6 @@
   display: flex;
   align-items: flex-start;
   gap: 16px;
-}
-
-.voter-metric-card--mint {
-  background: linear-gradient(135deg, #ffffff, var(--voter-green-soft));
 }
 
 .voter-metric-card--violet {
@@ -1118,11 +1094,6 @@
   color: var(--voter-amber);
 }
 
-.voter-alert--danger {
-  background: var(--voter-red-soft);
-  color: var(--voter-red);
-}
-
 .voter-primary-btn,
 .voter-secondary-btn {
   min-height: 44px;
@@ -1568,10 +1539,6 @@
 
 .voter-notification-item--warning .voter-notification-item__dot {
   background: #a46315;
-}
-
-.voter-notification-item--danger .voter-notification-item__dot {
-  background: #ba3545;
 }
 
 .voter-notification-item--info .voter-notification-item__dot {
@@ -2740,5 +2707,79 @@
     width: 42px !important;
     min-width: 42px !important;
     max-width: 42px !important;
+  }
+}
+/* SYSTEM NOTIFICATION DELETE BUTTON */
+
+.voter-notification-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.voter-notification-header-actions button {
+  border: 0;
+  background: transparent;
+  color: #247a52;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.voter-notification-header-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.voter-notification-item--with-action {
+  grid-template-columns: 10px minmax(0, 1fr) 34px;
+  align-items: start;
+}
+
+.voter-notification-delete-btn {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 12px;
+  background: #ffe4e9;
+  color: #ba3545;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    background 160ms ease;
+}
+
+.voter-notification-delete-btn:hover:not(:disabled) {
+  background: #ffd3dc;
+  transform: translateY(-1px);
+}
+
+.voter-notification-delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 520px) {
+  .voter-notification-dropdown__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .voter-notification-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .voter-notification-item--with-action {
+    grid-template-columns: 9px minmax(0, 1fr) 30px;
+  }
+
+  .voter-notification-delete-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 11px;
   }
 }

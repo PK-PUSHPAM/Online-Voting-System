@@ -18,7 +18,9 @@ export const castVoteSchema = z.object({
 export const getMyVotesSchema = z.object({
   body: emptyObjectSchema,
   params: emptyObjectSchema,
-  query: paginationQuerySchema,
+  query: paginationQuerySchema.extend({
+    electionId: mongoIdSchema("electionId").optional(),
+  }),
 });
 
 export const getVotesByElectionForAdminSchema = z.object({

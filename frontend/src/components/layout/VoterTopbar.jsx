@@ -9,6 +9,9 @@ import {
   MessageCircle,
   Send,
   ShieldCheck,
+  Trash2,
+  Wifi,
+  WifiOff,
   XCircle,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -20,6 +23,13 @@ import { getApiErrorMessage } from "../../lib/utils";
 
 const SYSTEM_NOTIFICATION_LIMIT = 10;
 const CHAT_MESSAGE_LIMIT = 20;
+
+const CHAT_EVENT_NAMES = {
+  messageCreated: "public_chat_message_created",
+  messageDeleted: "public_chat_message_deleted",
+  userBlocked: "public_chat_user_blocked",
+  userUnblocked: "public_chat_user_unblocked",
+};
 
 const pageMetaMap = {
   "/voter": {
@@ -33,6 +43,10 @@ const pageMetaMap = {
   "/voter/my-votes": {
     eyebrow: "History",
     title: "My Votes",
+  },
+  "/voter/results": {
+    eyebrow: "Final results",
+    title: "Election Results",
   },
   "/voter/profile": {
     eyebrow: "Account",
@@ -76,12 +90,29 @@ function getInitials(name = "User") {
   return `${parts[0]?.[0] || ""}${parts[1]?.[0] || ""}`.toUpperCase();
 }
 
+function normalizeMessages(messages = []) {
+  const map = new Map();
+
+  for (const message of messages) {
+    if (!message?._id || message?.isDeleted) continue;
+    map.set(String(message._id), message);
+  }
+
+  return Array.from(map.values()).sort((first, second) => {
+    return (
+      new Date(first?.createdAt || 0).getTime() -
+      new Date(second?.createdAt || 0).getTime()
+    );
+  });
+}
+
 export default function VoterTopbar({ onOpenSidebar = () => {} }) {
   const location = useLocation();
   const { user } = useAuth();
 
   const dropdownRef = useRef(null);
   const chatEndRef = useRef(null);
+  const eventSourceRef = useRef(null);
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [activeBellTab, setActiveBellTab] = useState("system");
@@ -98,6 +129,10 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
   });
   const [chatText, setChatText] = useState("");
   const [isSendingChat, setIsSendingChat] = useState(false);
+  const [deletingNotificationId, setDeletingNotificationId] = useState("");
+  const [isClearingRead, setIsClearingRead] = useState(false);
+  const [isChatLiveConnected, setIsChatLiveConnected] = useState(false);
+  const [isChatUsingFallback, setIsChatUsingFallback] = useState(false);
 
   const meta = useMemo(() => {
     if (location.pathname.startsWith("/voter/elections/")) {
@@ -126,12 +161,7 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
   const isEligible = Boolean(user?.isEligibleToVote);
 
   const orderedChatMessages = useMemo(() => {
-    return [...chatMessages].sort((first, second) => {
-      return (
-        new Date(first?.createdAt || 0).getTime() -
-        new Date(second?.createdAt || 0).getTime()
-      );
-    });
+    return normalizeMessages(chatMessages);
   }, [chatMessages]);
 
   const loadSystemNotifications = async () => {
@@ -145,7 +175,7 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
 
       setSystemNotifications(Array.isArray(data?.items) ? data.items : []);
       setSystemUnreadCount(Number(data?.unreadCount || 0));
-    } catch (error) {
+    } catch {
       setSystemNotifications([]);
       setSystemUnreadCount(0);
     } finally {
@@ -174,7 +204,9 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
       });
 
       setChatMessages(
-        Array.isArray(messagesData?.items) ? messagesData.items : [],
+        normalizeMessages(
+          Array.isArray(messagesData?.items) ? messagesData.items : [],
+        ),
       );
     } catch (error) {
       if (!silent) {
@@ -185,6 +217,69 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
         setIsLoadingChat(false);
       }
     }
+  };
+
+  const closePublicChatStream = () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    setIsChatLiveConnected(false);
+  };
+
+  const applyPublicChatEvent = (eventPayload) => {
+    const eventType = eventPayload?.eventType;
+    const payload = eventPayload?.payload;
+
+    if (!eventType) return;
+
+    if (eventType === CHAT_EVENT_NAMES.messageCreated && payload?._id) {
+      setChatMessages((currentMessages) =>
+        normalizeMessages([...currentMessages, payload]),
+      );
+      return;
+    }
+
+    if (eventType === CHAT_EVENT_NAMES.messageDeleted && payload?._id) {
+      setChatMessages((currentMessages) =>
+        currentMessages.filter(
+          (message) => String(message?._id) !== String(payload._id),
+        ),
+      );
+      return;
+    }
+
+    if (
+      eventType === CHAT_EVENT_NAMES.userBlocked ||
+      eventType === CHAT_EVENT_NAMES.userUnblocked
+    ) {
+      loadPublicChat({ silent: true });
+    }
+  };
+
+  const connectPublicChatStream = () => {
+    closePublicChatStream();
+
+    const eventSource = publicChatService.createPublicChatStream({
+      onOpen: () => {
+        setIsChatLiveConnected(true);
+        setIsChatUsingFallback(false);
+      },
+      onEvent: applyPublicChatEvent,
+      onError: () => {
+        setIsChatLiveConnected(false);
+        setIsChatUsingFallback(true);
+      },
+    });
+
+    if (!eventSource) {
+      setIsChatLiveConnected(false);
+      setIsChatUsingFallback(true);
+      return;
+    }
+
+    eventSourceRef.current = eventSource;
   };
 
   useEffect(() => {
@@ -199,9 +294,26 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
   ]);
 
   useEffect(() => {
-    if (!isDropdownOpen || activeBellTab !== "chat") return undefined;
+    if (!isDropdownOpen || activeBellTab !== "chat") {
+      closePublicChatStream();
+      setIsChatUsingFallback(false);
+      return undefined;
+    }
 
     loadPublicChat();
+    connectPublicChatStream();
+
+    return () => {
+      closePublicChatStream();
+      setIsChatUsingFallback(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDropdownOpen, activeBellTab]);
+
+  useEffect(() => {
+    if (!isDropdownOpen || activeBellTab !== "chat" || !isChatUsingFallback) {
+      return undefined;
+    }
 
     const intervalId = window.setInterval(() => {
       loadPublicChat({ silent: true });
@@ -211,7 +323,7 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
       window.clearInterval(intervalId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDropdownOpen, activeBellTab]);
+  }, [isDropdownOpen, activeBellTab, isChatUsingFallback]);
 
   useEffect(() => {
     if (!isDropdownOpen || activeBellTab !== "chat") return;
@@ -238,6 +350,12 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      closePublicChatStream();
+    };
+  }, []);
+
   const handleToggleDropdown = async () => {
     const nextState = !isDropdownOpen;
 
@@ -256,6 +374,8 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
     setActiveBellTab(tab);
 
     if (tab === "system") {
+      closePublicChatStream();
+      setIsChatUsingFallback(false);
       await loadSystemNotifications();
     }
 
@@ -274,6 +394,21 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
     }
   };
 
+  const handleClearRead = async () => {
+    try {
+      setIsClearingRead(true);
+
+      const data = await systemNotificationService.clearReadNotifications();
+      await loadSystemNotifications();
+
+      toast.success(`${data?.deletedCount || 0} read notification(s) deleted.`);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setIsClearingRead(false);
+    }
+  };
+
   const handleReadNotification = async (notification) => {
     if (!notification?._id) return;
 
@@ -286,6 +421,26 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
       setIsDropdownOpen(false);
     } catch (error) {
       toast.error(getApiErrorMessage(error));
+    }
+  };
+
+  const handleDeleteNotification = async (event, notificationId) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!notificationId) return;
+
+    try {
+      setDeletingNotificationId(notificationId);
+
+      await systemNotificationService.deleteNotification(notificationId);
+      await loadSystemNotifications();
+
+      toast.success("Notification deleted.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setDeletingNotificationId("");
     }
   };
 
@@ -307,7 +462,10 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
       await publicChatService.sendMessage(message);
 
       setChatText("");
-      await loadPublicChat({ silent: true });
+
+      if (!isChatLiveConnected) {
+        await loadPublicChat({ silent: true });
+      }
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     } finally {
@@ -386,13 +544,23 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
                 </div>
 
                 {activeBellTab === "system" ? (
-                  <button
-                    type="button"
-                    onClick={handleMarkAllRead}
-                    disabled={!systemNotifications.length}
-                  >
-                    Mark all read
-                  </button>
+                  <div className="voter-notification-header-actions">
+                    <button
+                      type="button"
+                      onClick={handleMarkAllRead}
+                      disabled={!systemNotifications.length}
+                    >
+                      Mark all read
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleClearRead}
+                      disabled={isClearingRead}
+                    >
+                      Clear read
+                    </button>
+                  </div>
                 ) : null}
               </div>
 
@@ -433,6 +601,7 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
                         <article
                           className={[
                             "voter-notification-item",
+                            "voter-notification-item--with-action",
                             getNotificationClass(notification.type),
                             !notification.isRead
                               ? "voter-notification-item--unread"
@@ -458,6 +627,20 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
                               ) : null}
                             </div>
                           </div>
+
+                          <button
+                            type="button"
+                            className="voter-notification-delete-btn"
+                            title="Delete notification"
+                            disabled={
+                              deletingNotificationId === notification._id
+                            }
+                            onClick={(event) =>
+                              handleDeleteNotification(event, notification._id)
+                            }
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </article>
                       );
 
@@ -494,6 +677,25 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
 
               {activeBellTab === "chat" && (
                 <div className="voter-chat-panel">
+                  <div className="voter-chat-live-status">
+                    {isChatLiveConnected ? (
+                      <>
+                        <Wifi size={13} />
+                        Live connected
+                      </>
+                    ) : isChatUsingFallback ? (
+                      <>
+                        <WifiOff size={13} />
+                        Live reconnecting • fallback refresh enabled
+                      </>
+                    ) : (
+                      <>
+                        <WifiOff size={13} />
+                        Connecting live chat...
+                      </>
+                    )}
+                  </div>
+
                   <div className="voter-chat-panel__body">
                     {isLoadingChat ? (
                       <div className="voter-notification-empty">
@@ -587,7 +789,10 @@ export default function VoterTopbar({ onOpenSidebar = () => {} }) {
                     View election center
                   </Link>
                 ) : (
-                  <span>Public chat refreshes automatically while open.</span>
+                  <span>
+                    Public chat is live when connected. Fallback refresh runs if
+                    live stream fails.
+                  </span>
                 )}
               </div>
             </div>

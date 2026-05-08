@@ -18,6 +18,7 @@ export const APP_ROUTES = {
   VOTER_DASHBOARD: "/voter",
   VOTER_ELECTIONS: "/voter/elections",
   VOTER_MY_VOTES: "/voter/my-votes",
+  VOTER_RESULTS: "/voter/results",
   VOTER_PROFILE: "/voter/profile",
   VOTER_ELECTION_DETAILS: "/voter/elections/:electionId",
 };

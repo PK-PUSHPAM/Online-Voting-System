@@ -160,6 +160,47 @@ export const markAllNotificationsAsRead = asyncHandler(async (req, res) => {
   );
 });
 
+export const deleteMyNotification = asyncHandler(async (req, res) => {
+  const { params } = req.validatedData || { params: req.params };
+  const { notificationId } = params;
+
+  const notification = await SystemNotification.findOneAndDelete({
+    _id: notificationId,
+    recipientId: req.user._id,
+  });
+
+  if (!notification) {
+    throw new ApiError(404, "Notification not found");
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        deletedNotificationId: notification._id,
+      },
+      "Notification deleted successfully",
+    ),
+  );
+});
+
+export const clearMyReadNotifications = asyncHandler(async (req, res) => {
+  const result = await SystemNotification.deleteMany({
+    recipientId: req.user._id,
+    isRead: true,
+  });
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        deletedCount: result.deletedCount || 0,
+      },
+      "Read notifications cleared successfully",
+    ),
+  );
+});
+
 export const createAdminSystemNotification = asyncHandler(async (req, res) => {
   const { body } = req.validatedData || { body: req.body };
   const {

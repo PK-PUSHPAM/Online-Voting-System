@@ -9,6 +9,10 @@ import {
   uploadOnCloudinary,
   deleteFromCloudinary,
 } from "../utils/cloudinary.util.js";
+import {
+  createSystemNotification,
+  createSystemNotificationsForRoles,
+} from "../services/systemNotification.service.js";
 import { buildPagination } from "../utils/pagination.util.js";
 import { buildPaginationResponse } from "../utils/paginationResponse.util.js";
 
@@ -277,6 +281,17 @@ export const approveVoter = asyncHandler(async (req, res) => {
     },
   });
 
+  await createSystemNotification({
+    recipientId: updatedVoter._id,
+    title: "Voter profile approved",
+    message:
+      "Your voter profile has been approved. You can vote in active elections.",
+    type: "success",
+    link: "/voter/profile",
+    createdBy: req.user._id,
+    source: "profile",
+  });
+
   return res
     .status(200)
     .json(new ApiResponse(200, updatedVoter, "Voter approved successfully"));
@@ -349,6 +364,18 @@ export const rejectVoter = asyncHandler(async (req, res) => {
     },
   });
 
+  await createSystemNotification({
+    recipientId: updatedVoter._id,
+    title: "Voter profile rejected",
+    message:
+      rejectionReason ||
+      "Your voter verification was rejected. Please check your profile.",
+    type: "danger",
+    link: "/voter/profile",
+    createdBy: req.user._id,
+    source: "profile",
+  });
+
   return res
     .status(200)
     .json(new ApiResponse(200, updatedVoter, "Voter rejected successfully"));
@@ -411,6 +438,18 @@ export const updateMyProfile = asyncHandler(async (req, res) => {
       updatedFields: Object.keys(body),
     },
   });
+
+  if (identityChanged) {
+    await createSystemNotificationsForRoles({
+      roles: ["admin", "super_admin"],
+      title: "Voter identity changed",
+      message: `${updatedUser.fullName || "A voter"} updated identity information and now requires re-approval.`,
+      type: "warning",
+      link: "/admin/voters",
+      createdBy: req.user._id,
+      source: "profile",
+    });
+  }
 
   return res.status(200).json(
     new ApiResponse(

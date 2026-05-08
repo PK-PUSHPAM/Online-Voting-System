@@ -22,6 +22,20 @@ export const markNotificationAsReadSchema = z.object({
   query: emptyObjectSchema,
 });
 
+export const deleteMyNotificationSchema = z.object({
+  body: emptyObjectSchema,
+  params: z.object({
+    notificationId: mongoIdSchema("notificationId"),
+  }),
+  query: emptyObjectSchema,
+});
+
+export const clearMyReadNotificationsSchema = z.object({
+  body: emptyObjectSchema,
+  params: emptyObjectSchema,
+  query: emptyObjectSchema,
+});
+
 export const markAllNotificationsAsReadSchema = z.object({
   body: emptyObjectSchema,
   params: emptyObjectSchema,

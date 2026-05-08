@@ -319,3 +319,141 @@ export const getPostResultForAdmin = asyncHandler(async (req, res) => {
     ),
   );
 });
+
+const canVoterViewResult = ({ election, voter }) => {
+  if (!election) {
+    throw new ApiError(404, "Election not found");
+  }
+
+  if (!election.isPublished) {
+    throw new ApiError(403, "Result is not available for this election");
+  }
+
+  if (election.status !== "ended") {
+    throw new ApiError(
+      403,
+      "Final result will be available only after election ends",
+    );
+  }
+
+  if (
+    election.allowedVoterType === "verifiedOnly" &&
+    voter?.verificationStatus !== "approved"
+  ) {
+    throw new ApiError(403, "Your account is not allowed to view this result");
+  }
+};
+
+export const getResultElectionsForVoter = asyncHandler(async (req, res) => {
+  const voter = req.user;
+
+  const elections = await Election.find({
+    isPublished: true,
+  })
+    .populate("createdBy", "fullName email role")
+    .sort({ endDate: -1 });
+
+  const syncedElections = await Promise.all(
+    elections.map(async (election) => {
+      const computedStatus = getElectionStatus(
+        election.startDate,
+        election.endDate,
+      );
+
+      if (election.status !== computedStatus) {
+        election.status = computedStatus;
+        await election.save({ validateBeforeSave: false });
+      }
+
+      return election;
+    }),
+  );
+
+  const visibleEndedElections = syncedElections.filter((election) => {
+    if (election.status !== "ended") return false;
+
+    if (
+      election.allowedVoterType === "verifiedOnly" &&
+      voter?.verificationStatus !== "approved"
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        count: visibleEndedElections.length,
+        elections: visibleEndedElections,
+      },
+      "Result elections fetched successfully",
+    ),
+  );
+});
+
+export const getElectionResultsForVoter = asyncHandler(async (req, res) => {
+  const { electionId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(electionId)) {
+    throw new ApiError(400, "Invalid electionId");
+  }
+
+  const election = await Election.findById(electionId).populate(
+    "createdBy",
+    "fullName email role",
+  );
+
+  if (!election) {
+    throw new ApiError(404, "Election not found");
+  }
+
+  const computedStatus = getElectionStatus(
+    election.startDate,
+    election.endDate,
+  );
+
+  if (election.status !== computedStatus) {
+    election.status = computedStatus;
+    await election.save({ validateBeforeSave: false });
+  }
+
+  canVoterViewResult({
+    election,
+    voter: req.user,
+  });
+
+  const { totalPosts, results } =
+    await buildRankedResultsForElection(electionId);
+
+  const totalVotesCast = results.reduce(
+    (sum, item) => sum + item.totalVotesCastForPost,
+    0,
+  );
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        election: {
+          _id: election._id,
+          title: election.title,
+          description: election.description,
+          startDate: election.startDate,
+          endDate: election.endDate,
+          status: election.status,
+          isPublished: election.isPublished,
+          allowedVoterType: election.allowedVoterType,
+          createdBy: election.createdBy,
+        },
+        totalPosts,
+        totalVotesCast,
+        isFinalResult: true,
+        results,
+      },
+      "Final election result fetched successfully",
+    ),
+  );
+});

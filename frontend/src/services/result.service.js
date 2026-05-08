@@ -12,4 +12,23 @@ export const resultService = {
     );
     return response?.data?.data || null;
   },
+
+  async getVoterResultElections() {
+    const response = await apiClient.get("/results/voter/elections");
+    return (
+      response?.data?.data || {
+        count: 0,
+        elections: [],
+      }
+    );
+  },
+
+  async getVoterElectionResults(electionId) {
+    if (!electionId) return null;
+
+    const response = await apiClient.get(
+      `/results/voter/election/${electionId}`,
+    );
+    return response?.data?.data || null;
+  },
 };

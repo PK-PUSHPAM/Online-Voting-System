@@ -26,6 +26,7 @@ import VoterElectionsPage from "../pages/voter/VoterElectionsPage";
 import VoterMyVotesPage from "../pages/voter/VoterMyVotesPage";
 import VoterProfilePage from "../pages/voter/VoterProfilePage";
 import VoterElectionDetailsPage from "../pages/voter/VoterElectionDetailsPage";
+import VoterResultsPage from "../pages/voter/VoterResultsPage";
 
 import DashboardLayout from "../components/layout/DashboardLayout";
 import VoterLayout from "../components/layout/VoterLayout";
@@ -98,6 +99,7 @@ export default function AppRouter() {
               element={<VoterElectionDetailsPage />}
             />
             <Route path="my-votes" element={<VoterMyVotesPage />} />
+            <Route path="results" element={<VoterResultsPage />} />
             <Route path="profile" element={<VoterProfilePage />} />
           </Route>
         </Route>
