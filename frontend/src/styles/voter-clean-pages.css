@@ -1383,3 +1383,269 @@
     white-space: normal;
   }
 }
+/* FINAL VOTER PROFILE COMPLETION */
+
+.vpp-danger-button {
+  color: #ba3545 !important;
+  background: #ffe4e9 !important;
+  border-color: #f5b8c4 !important;
+}
+
+.vpp-document-upload-box,
+.vpp-result-link-box {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 20px;
+  background: #fff0cf;
+  border: 1px solid #efd196;
+  color: #a46315;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.vpp-document-upload-box {
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.vpp-document-upload-box strong,
+.vpp-result-link-box strong {
+  display: block;
+  color: #17211b;
+  font-weight: 900;
+}
+
+.vpp-document-upload-box p,
+.vpp-result-link-box p {
+  margin: 5px 0 0;
+  color: #7d4b12;
+  line-height: 1.5;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.vpp-document-upload-box .vpp-upload-button {
+  margin-top: 12px;
+  display: inline-flex;
+  width: fit-content;
+}
+
+@media (max-width: 760px) {
+  .vpp-result-link-box {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .vpp-result-link-box .voter-clean-button {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+}
+/* ENDED ELECTION VISIBILITY FIX */
+
+.status-chip--violet {
+  color: #6750a4;
+  background: #eee7ff;
+}
+
+.voter-ended-note {
+  margin-top: 14px;
+  padding: 11px 12px;
+  border-radius: 15px;
+  background: #eee7ff;
+  border: 1px solid #d9ccff;
+  color: #55408f;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.voter-clean-button--result {
+  background: #6750a4 !important;
+  color: #ffffff !important;
+}
+
+.voter-clean-button--result:hover {
+  background: #55408f !important;
+}
+/* FINAL SPACING FIX: RESULT BUTTON + PROFILE ACTION BUTTONS */
+
+.voter-election-card-clean {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 100% !important;
+  gap: 14px !important;
+}
+
+.voter-election-card-clean > p {
+  margin-bottom: 0 !important;
+}
+
+.voter-election-card-clean__footer {
+  margin-top: auto !important;
+  padding-top: 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+  flex-wrap: wrap !important;
+  border-top: 1px solid #eee2d3 !important;
+}
+
+.voter-election-card-clean__footer > span {
+  min-width: 0 !important;
+  flex: 1 1 170px !important;
+  color: #5f6670 !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  line-height: 1.45 !important;
+}
+
+.voter-election-card-clean__footer .voter-clean-button {
+  flex: 0 0 auto !important;
+  min-width: 142px !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+}
+
+.voter-clean-button--result {
+  background: #6750a4 !important;
+  color: #ffffff !important;
+  box-shadow: 0 12px 24px rgba(103, 80, 164, 0.18) !important;
+}
+
+.voter-clean-button--result:hover {
+  background: #55408f !important;
+}
+
+/* Profile edit actions spacing */
+
+.vpp-form-actions {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 12px !important;
+  row-gap: 14px !important;
+}
+
+.vpp-form-actions > button,
+.vpp-form-actions > label,
+.vpp-form-actions .voter-clean-button,
+.vpp-form-actions .voter-secondary-btn {
+  flex: 0 0 auto !important;
+  min-height: 44px !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+}
+
+.vpp-upload-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-height: 44px !important;
+  padding: 0 16px !important;
+  border-radius: 999px !important;
+  box-sizing: border-box !important;
+}
+
+.vpp-danger-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-height: 44px !important;
+  padding: 0 16px !important;
+  border-radius: 999px !important;
+  color: #ba3545 !important;
+  background: #ffe4e9 !important;
+  border: 1px solid #f5b8c4 !important;
+  box-sizing: border-box !important;
+}
+
+.vpp-danger-button:hover:not(:disabled) {
+  background: #ffd3dc !important;
+}
+
+.vpp-danger-button:disabled,
+.vpp-upload-button:disabled,
+.vpp-form-actions button:disabled {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+}
+
+/* Prevent form controls from crushing each other */
+
+.vpp-form {
+  min-width: 0 !important;
+}
+
+.vpp-form-grid {
+  min-width: 0 !important;
+}
+
+.vpp-field {
+  min-width: 0 !important;
+}
+
+.vpp-field input,
+.vpp-field select {
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* Mobile fixes */
+
+@media (max-width: 760px) {
+  .voter-election-card-clean__footer {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  .voter-election-card-clean__footer > span {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+  }
+
+  .voter-election-card-clean__footer .voter-clean-button {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .vpp-form-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .vpp-form-actions > button,
+  .vpp-form-actions > label,
+  .vpp-form-actions .voter-clean-button,
+  .vpp-form-actions .voter-secondary-btn {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .vpp-upload-button,
+  .vpp-danger-button {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .voter-clean-election-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .voter-election-card-clean {
+    padding: 16px !important;
+  }
+
+  .voter-election-card-clean__footer {
+    padding-top: 14px !important;
+  }
+
+  .vpp-form-actions {
+    gap: 10px !important;
+  }
+}

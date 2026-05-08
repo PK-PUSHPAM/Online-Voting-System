@@ -16,4 +16,25 @@ export const voterProfileService = {
 
     return extractData(response);
   },
+
+  async removeProfilePhoto() {
+    const response = await apiClient.delete("/users/me/profile-photo");
+    return extractData(response);
+  },
+
+  async uploadVoterDocument(file) {
+    const formData = new FormData();
+    formData.append("document", file);
+
+    const response = await apiClient.patch("/users/me/document", formData);
+    return extractData(response);
+  },
+
+  async changeMyPassword(payload) {
+    const response = await apiClient.patch(
+      "/users/me/change-password",
+      payload,
+    );
+    return response?.data || {};
+  },
 };

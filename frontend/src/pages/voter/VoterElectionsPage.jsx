@@ -8,10 +8,11 @@ import {
   Search,
   ShieldCheck,
   TimerReset,
+  Trophy,
   Vote,
 } from "lucide-react";
 import { voterService } from "../../services/voter.service";
-import { buildVoterElectionDetailsRoute } from "../../lib/routes";
+import { APP_ROUTES, buildVoterElectionDetailsRoute } from "../../lib/routes";
 import { getApiErrorMessage } from "../../lib/utils";
 import "../../styles/voter.css";
 
@@ -19,6 +20,7 @@ const tabs = [
   { id: "all", label: "All elections" },
   { id: "upcoming", label: "Upcoming" },
   { id: "active", label: "Active now" },
+  { id: "ended", label: "Ended" },
   { id: "verified", label: "Verified access" },
 ];
 
@@ -52,6 +54,7 @@ function getElectionStatusMeta(election) {
       className: "status-chip status-chip--amber",
       actionText: "View Details",
       icon: TimerReset,
+      actionRoute: buildVoterElectionDetailsRoute(election?._id),
     };
   }
 
@@ -63,6 +66,17 @@ function getElectionStatusMeta(election) {
         : "status-chip status-chip--green",
       actionText: "Open Ballot",
       icon: Vote,
+      actionRoute: buildVoterElectionDetailsRoute(election?._id),
+    };
+  }
+
+  if (election?.status === "ended") {
+    return {
+      label: "Ended",
+      className: "status-chip status-chip--violet",
+      actionText: "View Result",
+      icon: Trophy,
+      actionRoute: APP_ROUTES.VOTER_RESULTS,
     };
   }
 
@@ -71,6 +85,7 @@ function getElectionStatusMeta(election) {
     className: "status-chip",
     actionText: "View Details",
     icon: Vote,
+    actionRoute: buildVoterElectionDetailsRoute(election?._id),
   };
 }
 
@@ -110,8 +125,12 @@ export default function VoterElectionsPage() {
           stats.active += 1;
         }
 
-        if (election?.allowedVoterType !== "all") {
-          stats.verifiedOnly += 1;
+        if (election?.status === "ended") {
+          stats.ended += 1;
+        }
+
+        if (election?.allowedVoterType === "verifiedOnly") {
+          stats.verified += 1;
         }
 
         return stats;
@@ -119,7 +138,8 @@ export default function VoterElectionsPage() {
       {
         upcoming: 0,
         active: 0,
-        verifiedOnly: 0,
+        ended: 0,
+        verified: 0,
       },
     );
   }, [elections]);
@@ -129,10 +149,22 @@ export default function VoterElectionsPage() {
 
     return elections
       .filter((election) => {
-        if (activeTab === "upcoming") return election?.status === "upcoming";
-        if (activeTab === "active") return election?.status === "active";
-        if (activeTab === "verified")
-          return election?.allowedVoterType !== "all";
+        if (activeTab === "upcoming") {
+          return election?.status === "upcoming";
+        }
+
+        if (activeTab === "active") {
+          return election?.status === "active";
+        }
+
+        if (activeTab === "ended") {
+          return election?.status === "ended";
+        }
+
+        if (activeTab === "verified") {
+          return election?.allowedVoterType === "verifiedOnly";
+        }
+
         return true;
       })
       .filter((election) => {
@@ -159,9 +191,9 @@ export default function VoterElectionsPage() {
           <span className="voter-eyebrow">Election centre</span>
           <h2>Published Elections</h2>
           <p>
-            Upcoming elections are now visible before start time. Active
-            elections can be opened for voting, while upcoming elections are
-            shown for awareness and preparation.
+            Upcoming elections are visible before start time, active elections
+            are open for voting, and ended elections are available for final
+            result viewing.
           </p>
         </div>
 
@@ -176,6 +208,12 @@ export default function VoterElectionsPage() {
             <Vote size={18} />
             <span>Active now</span>
             <strong>{loading ? "..." : electionStats.active}</strong>
+          </div>
+
+          <div>
+            <Trophy size={18} />
+            <span>Ended</span>
+            <strong>{loading ? "..." : electionStats.ended}</strong>
           </div>
         </div>
       </section>
@@ -264,25 +302,46 @@ export default function VoterElectionsPage() {
 
                 {election?.status === "upcoming" ? (
                   <div className="voter-upcoming-note">
-                    Voting will open automatically when the election reaches its
-                    start date.
+                    This election has not started yet. You can preview posts and
+                    candidates from the details page.
                   </div>
                 ) : null}
 
-                <Link
-                  className="voter-clean-button voter-clean-button--full"
-                  to={buildVoterElectionDetailsRoute(election._id)}
-                >
-                  {statusMeta.actionText}
-                  <ArrowRight size={16} />
-                </Link>
+                {election?.status === "ended" ? (
+                  <div className="voter-ended-note">
+                    This election has ended. Voting is closed and final result
+                    is available.
+                  </div>
+                ) : null}
+
+                <div className="voter-election-card-clean__footer">
+                  <span>
+                    {election?.status === "active"
+                      ? "Voting available"
+                      : election?.status === "ended"
+                        ? "Final result available"
+                        : "Preview available"}
+                  </span>
+
+                  <Link
+                    to={statusMeta.actionRoute}
+                    className={
+                      election?.status === "ended"
+                        ? "voter-clean-button voter-clean-button--result"
+                        : "voter-clean-button"
+                    }
+                  >
+                    {statusMeta.actionText}
+                    <ArrowRight size={16} />
+                  </Link>
+                </div>
               </article>
             );
           })}
         </div>
       ) : (
         <div className="voter-empty-box voter-empty-box--large">
-          No election found in this option. Change tab or clear the search.
+          No election found for this filter.
         </div>
       )}
     </section>

@@ -456,7 +456,6 @@ export const getPublishedElectionsForVoter = asyncHandler(async (req, res) => {
 
   const elections = await Election.find({
     isPublished: true,
-    status: { $in: ["upcoming", "active"] },
   })
     .populate("createdBy", "fullName email role")
     .sort({ startDate: 1 });
@@ -466,7 +465,9 @@ export const getPublishedElectionsForVoter = asyncHandler(async (req, res) => {
   );
 
   const visibleElections = syncedElections.filter((election) => {
-    if (!["upcoming", "active"].includes(election.status)) return false;
+    if (!["upcoming", "active", "ended"].includes(election.status)) {
+      return false;
+    }
 
     return canVoterSeeElection({
       election,
@@ -482,6 +483,10 @@ export const getPublishedElectionsForVoter = asyncHandler(async (req, res) => {
     (election) => election.status === "active",
   );
 
+  const endedElections = visibleElections.filter(
+    (election) => election.status === "ended",
+  );
+
   return res.status(200).json(
     new ApiResponse(
       200,
@@ -490,8 +495,10 @@ export const getPublishedElectionsForVoter = asyncHandler(async (req, res) => {
         elections: visibleElections,
         upcomingCount: upcomingElections.length,
         activeCount: activeElections.length,
+        endedCount: endedElections.length,
         upcomingElections,
         activeElections,
+        endedElections,
       },
       "Published elections fetched successfully",
     ),

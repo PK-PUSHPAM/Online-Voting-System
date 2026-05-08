@@ -14,6 +14,9 @@ import {
   Upload,
   UserCircle2,
   XCircle,
+  KeyRound,
+  Trash2,
+  UploadCloud,
 } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { voterProfileService } from "../../services/voterProfile.service";
@@ -24,6 +27,7 @@ import "../../styles/voter-clean-pages.css";
 const tabs = [
   { id: "identity", label: "Identity" },
   { id: "edit", label: "Edit Profile" },
+  { id: "security", label: "Security" },
   { id: "verification", label: "Verification" },
 ];
 
@@ -124,16 +128,24 @@ function InfoCard({ icon: Icon, label, value }) {
 }
 
 export default function VoterProfilePage() {
-  const { user, setUser, fetchCurrentUser } = useAuth();
+  const { user, setUser, fetchCurrentUser, logout } = useAuth();
 
   const [activeTab, setActiveTab] = useState("identity");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-
   const [formData, setFormData] = useState({
     fullName: "",
     identityType: "other",
     identityLast4: "",
+  });
+  const [isRemovingPhoto, setIsRemovingPhoto] = useState(false);
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
 
   useEffect(() => {
@@ -247,6 +259,109 @@ export default function VoterProfilePage() {
     } finally {
       setIsUploadingPhoto(false);
       event.target.value = "";
+    }
+  };
+
+  const handleRemoveProfilePhoto = async () => {
+    if (!user?.profilePhotoUrl) {
+      toast.error("No profile photo found.");
+      return;
+    }
+
+    const shouldRemove = window.confirm("Remove your profile photo?");
+
+    if (!shouldRemove) return;
+
+    try {
+      setIsRemovingPhoto(true);
+
+      const data = await voterProfileService.removeProfilePhoto();
+      const updatedUser = data?.user || null;
+
+      if (updatedUser) {
+        setUser(updatedUser);
+      } else {
+        await fetchCurrentUser();
+      }
+
+      toast.success("Profile photo removed.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setIsRemovingPhoto(false);
+    }
+  };
+
+  const handleDocumentUpload = async (event) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    const allowedTypes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Only PDF, JPG, PNG, or WEBP documents are allowed.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Document must be less than or equal to 5 MB.");
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      setIsUploadingDocument(true);
+
+      const data = await voterProfileService.uploadVoterDocument(file);
+      const updatedUser = data?.user || null;
+
+      if (updatedUser) {
+        setUser(updatedUser);
+      } else {
+        await fetchCurrentUser();
+      }
+
+      toast.success(
+        "Verification document uploaded. Admin re-approval is required.",
+      );
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setIsUploadingDocument(false);
+      event.target.value = "";
+    }
+  };
+
+  const handlePasswordChange = async (event) => {
+    event.preventDefault();
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error("New password and confirm password do not match.");
+      return;
+    }
+
+    try {
+      setIsChangingPassword(true);
+
+      await voterProfileService.changeMyPassword({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+
+      toast.success("Password changed. Please login again.");
+      await logout();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -503,6 +618,17 @@ export default function VoterProfilePage() {
                 <label className="voter-secondary-btn vpp-upload-button">
                   <Upload size={16} />
                   {isUploadingPhoto ? "Uploading..." : "Upload Photo"}
+                  {user?.profilePhotoUrl ? (
+                    <button
+                      type="button"
+                      className="voter-secondary-btn vpp-danger-button"
+                      onClick={handleRemoveProfilePhoto}
+                      disabled={isRemovingPhoto}
+                    >
+                      <Trash2 size={16} />
+                      {isRemovingPhoto ? "Removing..." : "Remove Photo"}
+                    </button>
+                  ) : null}
                   <input
                     type="file"
                     accept="image/jpeg,image/jpg,image/png,image/webp"
@@ -554,6 +680,31 @@ export default function VoterProfilePage() {
             </div>
           </section>
 
+          {verificationStatusLower === "rejected" ? (
+            <div className="vpp-document-upload-box">
+              <UploadCloud size={20} />
+
+              <div>
+                <strong>Upload corrected verification document</strong>
+                <p>
+                  Your profile was rejected. Upload a corrected document to send
+                  your account back for admin re-approval.
+                </p>
+
+                <label className="voter-clean-button vpp-upload-button">
+                  <UploadCloud size={16} />
+                  {isUploadingDocument ? "Uploading..." : "Upload Document"}
+                  <input
+                    type="file"
+                    accept="application/pdf,image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={handleDocumentUpload}
+                    disabled={isUploadingDocument}
+                  />
+                </label>
+              </div>
+            </div>
+          ) : null}
+
           {verificationStatusLower === "rejected" && (
             <section className="voter-alert voter-alert--danger">
               <XCircle size={18} />
@@ -576,6 +727,98 @@ export default function VoterProfilePage() {
               </div>
             </section>
           )}
+        </div>
+      )}
+
+      {activeTab === "security" && (
+        <div className="vcp-tab-panel">
+          <section className="vcp-card">
+            <div className="vcp-card-header">
+              <div>
+                <h3>Change Password</h3>
+                <p>
+                  Update your account password. After successful change you will
+                  be logged out and must login again.
+                </p>
+              </div>
+            </div>
+
+            <form className="vpp-form" onSubmit={handlePasswordChange}>
+              <div className="vpp-form-grid">
+                <label className="vpp-field">
+                  <span>Current Password</span>
+                  <input
+                    type="password"
+                    value={passwordForm.currentPassword}
+                    onChange={(event) =>
+                      setPasswordForm((current) => ({
+                        ...current,
+                        currentPassword: event.target.value,
+                      }))
+                    }
+                    placeholder="Enter current password"
+                    required
+                  />
+                </label>
+
+                <label className="vpp-field">
+                  <span>New Password</span>
+                  <input
+                    type="password"
+                    value={passwordForm.newPassword}
+                    onChange={(event) =>
+                      setPasswordForm((current) => ({
+                        ...current,
+                        newPassword: event.target.value,
+                      }))
+                    }
+                    placeholder="Enter new password"
+                    minLength={8}
+                    required
+                  />
+                </label>
+
+                <label className="vpp-field">
+                  <span>Confirm New Password</span>
+                  <input
+                    type="password"
+                    value={passwordForm.confirmPassword}
+                    onChange={(event) =>
+                      setPasswordForm((current) => ({
+                        ...current,
+                        confirmPassword: event.target.value,
+                      }))
+                    }
+                    placeholder="Confirm new password"
+                    minLength={8}
+                    required
+                  />
+                </label>
+              </div>
+
+              <div className="vpp-warning-box">
+                <KeyRound size={18} />
+                <div>
+                  <strong>Password rules</strong>
+                  <p>
+                    Use at least 8 characters with uppercase, lowercase, number,
+                    and special character.
+                  </p>
+                </div>
+              </div>
+
+              <div className="vpp-form-actions">
+                <button
+                  type="submit"
+                  className="voter-clean-button"
+                  disabled={isChangingPassword}
+                >
+                  <KeyRound size={16} />
+                  {isChangingPassword ? "Changing..." : "Change Password"}
+                </button>
+              </div>
+            </form>
+          </section>
         </div>
       )}
     </section>

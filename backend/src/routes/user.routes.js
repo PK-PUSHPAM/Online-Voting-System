@@ -2,7 +2,10 @@ import express from "express";
 import verifyJWT from "../middleware/auth.middleware.js";
 import authorizeRoles from "../middleware/role.middleware.js";
 import validate from "../middleware/validate.middleware.js";
-import { uploadProfilePhoto } from "../middleware/profilePhotoUpload.middleware.js";
+import {
+  uploadProfilePhoto,
+  uploadVoterDocument,
+} from "../middleware/multer.middleware.js";
 import {
   getPendingVoters,
   getAllVoters,
@@ -11,6 +14,9 @@ import {
   rejectVoter,
   updateMyProfile,
   uploadMyProfilePhoto,
+  removeMyProfilePhoto,
+  uploadMyVoterDocument,
+  changeMyPassword,
 } from "../controllers/user.controller.js";
 import {
   getPendingVotersSchema,
@@ -18,6 +24,7 @@ import {
   getVoterByIdSchema,
   approveRejectVoterSchema,
   updateMyProfileSchema,
+  changeMyPasswordSchema,
 } from "../validations/user.validation.js";
 
 const router = express.Router();
@@ -36,6 +43,29 @@ router.patch(
   authorizeRoles("voter"),
   uploadProfilePhoto,
   uploadMyProfilePhoto,
+);
+
+router.delete(
+  "/me/profile-photo",
+  verifyJWT,
+  authorizeRoles("voter"),
+  removeMyProfilePhoto,
+);
+
+router.patch(
+  "/me/document",
+  verifyJWT,
+  authorizeRoles("voter"),
+  uploadVoterDocument,
+  uploadMyVoterDocument,
+);
+
+router.patch(
+  "/me/change-password",
+  verifyJWT,
+  authorizeRoles("voter"),
+  validate(changeMyPasswordSchema),
+  changeMyPassword,
 );
 
 router.get(

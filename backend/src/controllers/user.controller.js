@@ -9,6 +9,7 @@ import {
   uploadOnCloudinary,
   deleteFromCloudinary,
 } from "../utils/cloudinary.util.js";
+import { CLOUDINARY_FOLDERS } from "../constants/upload.constants.js";
 import {
   createSystemNotification,
   createSystemNotificationsForRoles,
@@ -439,18 +440,6 @@ export const updateMyProfile = asyncHandler(async (req, res) => {
     },
   });
 
-  if (identityChanged) {
-    await createSystemNotificationsForRoles({
-      roles: ["admin", "super_admin"],
-      title: "Voter identity changed",
-      message: `${updatedUser.fullName || "A voter"} updated identity information and now requires re-approval.`,
-      type: "warning",
-      link: "/admin/voters",
-      createdBy: req.user._id,
-      source: "profile",
-    });
-  }
-
   return res.status(200).json(
     new ApiResponse(
       200,
@@ -473,21 +462,17 @@ export const uploadMyProfilePhoto = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id);
 
   if (!user) {
-    cleanupLocalFile(req.file.path);
     throw new ApiError(404, "User not found");
   }
 
   if (user.role !== "voter") {
-    cleanupLocalFile(req.file.path);
     throw new ApiError(403, "Only voters can upload voter profile photo");
   }
 
   const uploadedImage = await uploadOnCloudinary(req.file.path, {
-    folder: PROFILE_PHOTO_FOLDER,
+    folder: CLOUDINARY_FOLDERS.profilePhotos,
     resourceType: "image",
   });
-
-  cleanupLocalFile(req.file.path);
 
   if (!uploadedImage?.secure_url || !uploadedImage?.public_id) {
     throw new ApiError(500, "Failed to upload profile photo");
@@ -540,4 +525,203 @@ export const uploadMyProfilePhoto = asyncHandler(async (req, res) => {
       "Profile photo uploaded successfully",
     ),
   );
+});
+
+export const removeMyProfilePhoto = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if (user.role !== "voter") {
+    throw new ApiError(403, "Only voters can remove voter profile photo");
+  }
+
+  const oldProfilePhotoPublicId = user.profilePhotoPublicId;
+
+  user.profilePhotoUrl = "";
+  user.profilePhotoPublicId = "";
+
+  await user.save({ validateBeforeSave: false });
+
+  if (oldProfilePhotoPublicId) {
+    try {
+      await deleteFromCloudinary(oldProfilePhotoPublicId, {
+        resourceType: "image",
+      });
+    } catch (error) {
+      console.warn(`Failed to delete profile photo: ${error.message}`);
+    }
+  }
+
+  const updatedUser = await User.findById(user._id).select(
+    "-password -refreshToken",
+  );
+
+  await createAuditLog({
+    req,
+    actorId: req.user._id,
+    actorRole: req.user.role,
+    action: "user.remove_my_profile_photo",
+    targetType: "User",
+    targetId: user._id,
+    status: "success",
+  });
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        user: updatedUser,
+      },
+      "Profile photo removed successfully",
+    ),
+  );
+});
+
+export const uploadMyVoterDocument = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(400, "Voter document is required");
+  }
+
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if (user.role !== "voter") {
+    throw new ApiError(403, "Only voters can upload voter documents");
+  }
+
+  if (user.verificationStatus === "approved") {
+    throw new ApiError(
+      400,
+      "Approved voters cannot change verification document",
+    );
+  }
+
+  const isPdf = req.file.mimetype === "application/pdf";
+  const resourceType = isPdf ? "raw" : "image";
+
+  const uploadedDocument = await uploadOnCloudinary(req.file.path, {
+    folder: CLOUDINARY_FOLDERS.voterDocuments,
+    resourceType,
+  });
+
+  if (!uploadedDocument?.secure_url || !uploadedDocument?.public_id) {
+    throw new ApiError(500, "Failed to upload voter document");
+  }
+
+  const oldDocumentPublicId = user.documentPublicId;
+  const oldResourceType = oldDocumentPublicId?.toLowerCase().endsWith(".pdf")
+    ? "raw"
+    : "image";
+
+  user.documentUrl = uploadedDocument.secure_url;
+  user.documentPublicId = uploadedDocument.public_id;
+  user.verificationStatus = "pending";
+  user.isEligibleToVote = false;
+  user.verifiedBy = null;
+  user.verifiedAt = null;
+  user.verificationRejectionReason = "";
+  user.verificationNotes =
+    "Voter uploaded a new verification document. Admin re-approval required.";
+
+  await user.save({ validateBeforeSave: false });
+
+  if (
+    oldDocumentPublicId &&
+    oldDocumentPublicId !== uploadedDocument.public_id
+  ) {
+    try {
+      await deleteFromCloudinary(oldDocumentPublicId, {
+        resourceType: oldResourceType,
+      });
+    } catch (error) {
+      console.warn(`Failed to delete old voter document: ${error.message}`);
+    }
+  }
+
+  const updatedUser = await User.findById(user._id).select(
+    "-password -refreshToken",
+  );
+
+  await createAuditLog({
+    req,
+    actorId: req.user._id,
+    actorRole: req.user.role,
+    action: "user.upload_my_voter_document",
+    targetType: "User",
+    targetId: user._id,
+    status: "success",
+    meta: {
+      documentPublicId: user.documentPublicId,
+    },
+  });
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        user: updatedUser,
+        documentUrl: user.documentUrl,
+      },
+      "Verification document uploaded successfully. Admin re-approval required.",
+    ),
+  );
+});
+
+export const changeMyPassword = asyncHandler(async (req, res) => {
+  const { body } = req.validatedData || { body: req.body };
+  const { currentPassword, newPassword } = body;
+
+  const user = await User.findById(req.user._id).select("+refreshToken");
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const isPasswordCorrect = await user.isPasswordCorrect(currentPassword);
+
+  if (!isPasswordCorrect) {
+    throw new ApiError(400, "Current password is incorrect");
+  }
+
+  const isSamePassword = await user.isPasswordCorrect(newPassword);
+
+  if (isSamePassword) {
+    throw new ApiError(
+      400,
+      "New password must be different from current password",
+    );
+  }
+
+  user.password = newPassword;
+  user.refreshToken = "";
+
+  await user.save();
+
+  await createAuditLog({
+    req,
+    actorId: req.user._id,
+    actorRole: req.user.role,
+    action: "user.change_my_password",
+    targetType: "User",
+    targetId: user._id,
+    status: "success",
+  });
+
+  return res
+    .status(200)
+    .clearCookie("accessToken")
+    .clearCookie("refreshToken")
+    .json(
+      new ApiResponse(
+        200,
+        null,
+        "Password changed successfully. Please login again.",
+      ),
+    );
 });

@@ -13,6 +13,7 @@ import {
   TimerReset,
   UserCircle2,
   Vote,
+  Trophy,
 } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { voterService } from "../../services/voter.service";
@@ -500,6 +501,27 @@ export default function VoterElectionDetailsPage() {
                     </strong>
                   </div>
                 </div>
+
+                {election?.status === "ended" ? (
+                  <div className="vpp-result-link-box">
+                    <Trophy size={20} />
+
+                    <div>
+                      <strong>Final result is available</strong>
+                      <p>
+                        This election has ended. You can now view the final
+                        post-wise result.
+                      </p>
+                    </div>
+
+                    <Link
+                      className="voter-clean-button"
+                      to={APP_ROUTES.VOTER_RESULTS}
+                    >
+                      View Final Result
+                    </Link>
+                  </div>
+                ) : null}
               </section>
             </div>
           )}

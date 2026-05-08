@@ -36,7 +36,7 @@ const canVoterAccessElection = ({ election, voter }) => {
     throw new ApiError(403, "Election is not published for voters");
   }
 
-  if (!["upcoming", "active"].includes(election.status)) {
+  if (!["upcoming", "active", "ended"].includes(election.status)) {
     throw new ApiError(403, "This election is not available for voters");
   }
 
