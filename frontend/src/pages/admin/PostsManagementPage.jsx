@@ -1,5 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { Briefcase, ListOrdered, Vote } from "lucide-react";
+import {
+  Briefcase,
+  CheckCircle2,
+  Filter,
+  LayoutGrid,
+  ListChecks,
+  PlusCircle,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Trophy,
+  Vote,
+} from "lucide-react";
 import { toast } from "react-hot-toast";
 import Button from "../../components/common/Button";
 import InputField from "../../components/common/InputField";
@@ -7,8 +19,12 @@ import { electionService } from "../../services/election.service";
 import { postService } from "../../services/post.service";
 import { getApiErrorMessage } from "../../lib/utils";
 import "../../styles/admin-crud.css";
+import "../../styles/admin-light-theme.css";
+
+const PAGE_LIMIT = 10;
 
 const initialForm = {
+  electionId: "",
   title: "",
   description: "",
   maxVotesPerVoter: 1,
@@ -16,123 +32,259 @@ const initialForm = {
   isActive: true,
 };
 
+const tabs = [
+  { id: "overview", label: "Overview", icon: LayoutGrid },
+  { id: "create", label: "Create", icon: PlusCircle },
+  { id: "manage", label: "Manage", icon: ListChecks },
+];
+
+function formatDateTime(value) {
+  if (!value) return "-";
+
+  try {
+    return new Intl.DateTimeFormat("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return "-";
+  }
+}
+
+function getElectionTitle(elections, electionId) {
+  const matchedElection = elections.find(
+    (election) => String(election._id) === String(electionId),
+  );
+
+  return matchedElection?.title || "Election";
+}
+
+function StatusPill({ active }) {
+  return (
+    <span
+      className={
+        active
+          ? "amp-status amp-status--active"
+          : "amp-status amp-status--inactive"
+      }
+    >
+      {active ? "Active" : "Inactive"}
+    </span>
+  );
+}
+
+function MetricCard({ icon: Icon, label, value, helper, tone = "green" }) {
+  return (
+    <article className={`amp-metric-card amp-metric-card--${tone}`}>
+      <div className="amp-metric-card__icon">
+        <Icon size={20} />
+      </div>
+
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        {helper ? <p>{helper}</p> : null}
+      </div>
+    </article>
+  );
+}
+
+function PostCard({ post, elections }) {
+  const electionId =
+    post?.electionId?._id || post?.electionId || post?.election?._id || "";
+
+  const electionTitle =
+    post?.electionId?.title ||
+    post?.election?.title ||
+    getElectionTitle(elections, electionId);
+
+  return (
+    <article className="amp-post-card">
+      <div className="amp-post-card__top">
+        <div>
+          <h4>{post?.title || "Untitled post"}</h4>
+          <p>{post?.description || "No post description added."}</p>
+        </div>
+
+        <StatusPill active={post?.isActive !== false} />
+      </div>
+
+      <div className="amp-post-card__meta">
+        <div>
+          <Vote size={15} />
+          <span>Election</span>
+          <strong>{electionTitle}</strong>
+        </div>
+
+        <div>
+          <ShieldCheck size={15} />
+          <span>Vote limit</span>
+          <strong>{post?.maxVotesPerVoter || 1}</strong>
+        </div>
+
+        <div>
+          <ListChecks size={15} />
+          <span>Order</span>
+          <strong>{post?.displayOrder ?? 0}</strong>
+        </div>
+      </div>
+
+      <div className="amp-post-card__footer">
+        <span className="amp-id-chip">
+          <CheckCircle2 size={13} />
+          ID: {String(post?._id || "").slice(-6)}
+        </span>
+
+        <span className="amp-id-chip">
+          Created: {formatDateTime(post?.createdAt)}
+        </span>
+      </div>
+    </article>
+  );
+}
+
 export default function PostsManagementPage() {
-  const [elections, setElections] = useState([]);
-  const [selectedElectionId, setSelectedElectionId] = useState("");
-  const [posts, setPosts] = useState([]);
-  const [pagination, setPagination] = useState(null);
-  const [loadingElections, setLoadingElections] = useState(true);
-  const [loadingPosts, setLoadingPosts] = useState(false);
-  const [createLoading, setCreateLoading] = useState(false);
-  const [activeFilter, setActiveFilter] = useState("");
+  const [activeTab, setActiveTab] = useState("overview");
+
   const [form, setForm] = useState(initialForm);
+  const [posts, setPosts] = useState([]);
+  const [elections, setElections] = useState([]);
+  const [pagination, setPagination] = useState(null);
 
-  const selectedElection = useMemo(
-    () => elections.find((item) => item._id === selectedElectionId) || null,
-    [elections, selectedElectionId],
-  );
+  const [loading, setLoading] = useState(true);
+  const [createLoading, setCreateLoading] = useState(false);
 
-  const totalPosts = useMemo(
-    () => pagination?.totalItems || posts.length || 0,
-    [pagination, posts.length],
-  );
+  const [search, setSearch] = useState("");
+  const [electionFilter, setElectionFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
 
-  const activePosts = useMemo(
-    () => posts.filter((item) => item.isActive).length,
-    [posts],
-  );
+  const totalCount = Number(pagination?.totalItems || posts.length || 0);
+
+  const stats = useMemo(() => {
+    return posts.reduce(
+      (acc, post) => {
+        if (post?.isActive !== false) acc.active += 1;
+        if (post?.isActive === false) acc.inactive += 1;
+        acc.totalVoteLimit += Number(post?.maxVotesPerVoter || 1);
+        return acc;
+      },
+      {
+        active: 0,
+        inactive: 0,
+        totalVoteLimit: 0,
+      },
+    );
+  }, [posts]);
+
+  const latestPosts = useMemo(() => posts.slice(0, 5), [posts]);
 
   const loadElections = async () => {
     try {
-      setLoadingElections(true);
-      const data = await electionService.getAll({ page: 1, limit: 100 });
-      const items = Array.isArray(data?.items) ? data.items : [];
-      setElections(items);
+      const data = await electionService.getAll({
+        page: 1,
+        limit: 100,
+      });
 
-      if (!selectedElectionId && items.length > 0) {
-        setSelectedElectionId(items[0]._id);
-      }
+      const normalizedElections = Array.isArray(data?.items) ? data.items : [];
+      setElections(normalizedElections);
+
+      setForm((current) => ({
+        ...current,
+        electionId: current.electionId || normalizedElections?.[0]?._id || "",
+      }));
     } catch (error) {
       toast.error(getApiErrorMessage(error));
       setElections([]);
-    } finally {
-      setLoadingElections(false);
     }
   };
 
-  const loadPosts = async (electionId) => {
-    if (!electionId) {
-      setPosts([]);
-      setPagination(null);
-      return;
-    }
-
+  const loadPosts = async (pageToLoad = page) => {
     try {
-      setLoadingPosts(true);
+      setLoading(true);
 
-      const data = await postService.getByElection(electionId, {
-        page: 1,
-        limit: 50,
-        ...(activeFilter === "" ? {} : { isActive: activeFilter === "active" }),
+      const data = await postService.getAll({
+        page: pageToLoad,
+        limit: PAGE_LIMIT,
+        ...(search.trim() ? { search: search.trim() } : {}),
+        ...(electionFilter ? { electionId: electionFilter } : {}),
+        ...(statusFilter ? { isActive: statusFilter } : {}),
       });
 
       setPosts(Array.isArray(data?.items) ? data.items : []);
       setPagination(data?.pagination || null);
+      setPage(pageToLoad);
     } catch (error) {
       toast.error(getApiErrorMessage(error));
       setPosts([]);
       setPagination(null);
     } finally {
-      setLoadingPosts(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     loadElections();
+    loadPosts(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (selectedElectionId) {
-      loadPosts(selectedElectionId);
-    }
-  }, [selectedElectionId, activeFilter]);
-
-  const handleFormChange = (event) => {
+  const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
 
-    setForm((prev) => ({
-      ...prev,
+    setForm((current) => ({
+      ...current,
       [name]: type === "checkbox" ? checked : value,
     }));
+  };
+
+  const validateForm = () => {
+    if (!form.electionId) {
+      toast.error("Please select an election.");
+      return false;
+    }
+
+    if (!form.title.trim()) {
+      toast.error("Post title is required.");
+      return false;
+    }
+
+    const maxVotes = Number(form.maxVotesPerVoter);
+
+    if (!Number.isInteger(maxVotes) || maxVotes < 1 || maxVotes > 10) {
+      toast.error("Max votes per voter must be between 1 and 10.");
+      return false;
+    }
+
+    return true;
   };
 
   const handleCreate = async (event) => {
     event.preventDefault();
 
-    if (!selectedElectionId) {
-      toast.error("Please select an election first.");
-      return;
-    }
-
-    if (!form.title.trim()) {
-      toast.error("Post title is required.");
-      return;
-    }
+    if (!validateForm()) return;
 
     try {
       setCreateLoading(true);
 
-      await postService.create(selectedElectionId, {
+      await postService.create({
+        electionId: form.electionId,
         title: form.title.trim(),
         description: form.description.trim(),
         maxVotesPerVoter: Number(form.maxVotesPerVoter),
-        displayOrder: Number(form.displayOrder),
-        isActive: form.isActive,
+        displayOrder: Number(form.displayOrder || 0),
+        isActive: Boolean(form.isActive),
       });
 
       toast.success("Post created successfully.");
-      setForm(initialForm);
-      await loadPosts(selectedElectionId);
+
+      setForm((current) => ({
+        ...initialForm,
+        electionId: current.electionId,
+      }));
+
+      setActiveTab("manage");
+      await loadPosts(1);
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     } finally {
@@ -140,223 +292,394 @@ export default function PostsManagementPage() {
     }
   };
 
+  const handleFilterSubmit = async (event) => {
+    event.preventDefault();
+    await loadPosts(1);
+  };
+
+  const handleRefresh = async () => {
+    await Promise.all([loadElections(), loadPosts(page)]);
+    toast.success("Posts refreshed.");
+  };
+
+  const hasPrevPage = Boolean(pagination?.hasPrevPage);
+  const hasNextPage = Boolean(pagination?.hasNextPage);
+  const currentPage = Number(pagination?.currentPage || page || 1);
+  const totalPages = Number(pagination?.totalPages || 1);
+
   return (
-    <section className="admin-crud">
-      <div className="admin-crud__hero">
-        <div className="admin-crud__hero-copy">
-          <span className="admin-crud__eyebrow">
-            <Briefcase size={14} />
-            Position structure
+    <section className="admin-crud amp-page">
+      <section className="amp-hero">
+        <div>
+          <span className="adm-eyebrow">
+            <Briefcase size={15} />
+            Post control
           </span>
 
-          <h2>
-            Define election posts clearly so ballot structure remains consistent
-            and easy to manage.
-          </h2>
+          <h2>Manage election posts with a clean workflow.</h2>
 
-          <p>
-            Posts determine how candidates are organized within an election.
-            Clear titles, voting limits, and ordering rules help ensure that the
-            ballot remains understandable for both administrators and voters.
-          </p>
+          <div className="amp-hero-actions">
+            <button
+              type="button"
+              className="adm-primary-btn"
+              onClick={() => setActiveTab("create")}
+            >
+              <PlusCircle size={16} />
+              Create Post
+            </button>
+
+            <button
+              type="button"
+              className="adm-secondary-btn"
+              onClick={() => setActiveTab("manage")}
+            >
+              Manage List
+            </button>
+          </div>
         </div>
 
-        <div className="admin-crud__hero-grid">
-          <div className="admin-crud__hero-stat">
-            <span>Selected election</span>
-            <strong>
-              {selectedElection ? selectedElection.title.slice(0, 18) : "None"}
-            </strong>
+        <div className="amp-hero-mini-grid">
+          <div>
+            <span>Total</span>
+            <strong>{loading ? "..." : totalCount}</strong>
           </div>
-          <div className="admin-crud__hero-stat">
-            <span>Total posts</span>
-            <strong>{totalPosts}</strong>
+
+          <div>
+            <span>Active</span>
+            <strong>{loading ? "..." : stats.active}</strong>
           </div>
-          <div className="admin-crud__hero-stat">
-            <span>Active posts</span>
-            <strong>{activePosts}</strong>
-          </div>
-          <div className="admin-crud__hero-stat">
-            <span>Current filter</span>
-            <strong>{activeFilter || "All"}</strong>
+
+          <div>
+            <span>Elections</span>
+            <strong>{elections.length}</strong>
           </div>
         </div>
+      </section>
+
+      <div className="adm-tabs" role="tablist" aria-label="Post sections">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              className={activeTab === tab.id ? "is-active" : ""}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <Icon size={16} />
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="admin-crud__grid">
-        <div className="admin-crud__panel admin-crud__panel--sticky">
-          <div className="admin-crud__panel-header">
-            <div>
-              <h3>Create post</h3>
-              <p>
-                Add a structured position or post under the selected election.
-              </p>
-            </div>
-            <span className="admin-crud__panel-badge">02</span>
+      {activeTab === "overview" && (
+        <div className="amp-tab-panel">
+          <div className="amp-metric-grid">
+            <MetricCard
+              icon={Briefcase}
+              label="Total Posts"
+              value={totalCount}
+              helper="Across current filters"
+              tone="green"
+            />
+
+            <MetricCard
+              icon={CheckCircle2}
+              label="Active"
+              value={stats.active}
+              helper="Available for voting"
+              tone="purple"
+            />
+
+            <MetricCard
+              icon={Trophy}
+              label="Inactive"
+              value={stats.inactive}
+              helper="Hidden from voting"
+              tone="amber"
+            />
+
+            <MetricCard
+              icon={ShieldCheck}
+              label="Vote Limit Sum"
+              value={stats.totalVoteLimit}
+              helper="Current page total"
+              tone="rose"
+            />
           </div>
 
-          <form className="admin-crud__form" onSubmit={handleCreate}>
-            <div className="form-field">
-              <label className="form-label">Election</label>
-              <select
-                className="admin-crud__select"
-                value={selectedElectionId}
-                onChange={(event) => setSelectedElectionId(event.target.value)}
-                disabled={loadingElections || elections.length === 0}
+          <section className="amp-panel-card">
+            <div className="amp-panel-header">
+              <div>
+                <h3>Latest posts</h3>
+                <span>Quick preview from current page</span>
+              </div>
+
+              <button
+                type="button"
+                className="adm-secondary-btn"
+                onClick={() => setActiveTab("manage")}
               >
-                {elections.length === 0 ? (
-                  <option value="">No elections found</option>
-                ) : (
-                  elections.map((election) => (
+                Open Manage
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="amp-empty-box">Loading posts...</div>
+            ) : latestPosts.length ? (
+              <div className="amp-compact-list">
+                {latestPosts.map((post) => (
+                  <article key={post._id} className="amp-compact-row">
+                    <div className="amp-compact-row__icon">
+                      <Briefcase size={16} />
+                    </div>
+
+                    <div>
+                      <h4>{post?.title || "Post"}</h4>
+                      <p>
+                        {post?.electionId?.title ||
+                          getElectionTitle(elections, post?.electionId)}{" "}
+                        • Max votes {post?.maxVotesPerVoter || 1}
+                      </p>
+                    </div>
+
+                    <StatusPill active={post?.isActive !== false} />
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="amp-empty-box">No posts found.</div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {activeTab === "create" && (
+        <div className="amp-tab-panel">
+          <section className="amp-panel-card">
+            <div className="amp-panel-header">
+              <div>
+                <h3>Create post</h3>
+                <span>Select election and define voting position</span>
+              </div>
+
+              <span className="amp-panel-badge">New</span>
+            </div>
+
+            <form className="amp-form" onSubmit={handleCreate}>
+              <div className="amp-form-grid">
+                <div className="form-field amp-form-grid__full">
+                  <label className="form-label">Election</label>
+                  <select
+                    name="electionId"
+                    value={form.electionId}
+                    onChange={handleChange}
+                    className="admin-crud__select"
+                  >
+                    <option value="">Select election</option>
+                    {elections.map((election) => (
+                      <option key={election._id} value={election._id}>
+                        {election.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <InputField
+                  label="Post Title"
+                  name="title"
+                  placeholder="President / Secretary / Treasurer"
+                  value={form.title}
+                  onChange={handleChange}
+                />
+
+                <InputField
+                  label="Max Votes Per Voter"
+                  name="maxVotesPerVoter"
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={form.maxVotesPerVoter}
+                  onChange={handleChange}
+                />
+
+                <InputField
+                  label="Display Order"
+                  name="displayOrder"
+                  type="number"
+                  min="0"
+                  value={form.displayOrder}
+                  onChange={handleChange}
+                />
+
+                <label className="amp-switch-card">
+                  <div>
+                    <strong>Post active</strong>
+                    <span>
+                      Inactive posts will not be available for voting.
+                    </span>
+                  </div>
+
+                  <input
+                    type="checkbox"
+                    name="isActive"
+                    checked={form.isActive}
+                    onChange={handleChange}
+                  />
+                </label>
+
+                <div className="form-field amp-form-grid__full">
+                  <label className="form-label">Description</label>
+                  <textarea
+                    className="admin-crud__textarea"
+                    name="description"
+                    placeholder="Short post description"
+                    value={form.description}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+
+              <div className="amp-form-actions">
+                <Button
+                  className="admin-crud__submit"
+                  type="submit"
+                  loading={createLoading}
+                  disabled={!elections.length}
+                >
+                  Create Post
+                </Button>
+
+                <button
+                  type="button"
+                  className="adm-secondary-btn"
+                  onClick={() =>
+                    setForm((current) => ({
+                      ...initialForm,
+                      electionId: current.electionId,
+                    }))
+                  }
+                  disabled={createLoading}
+                >
+                  Reset
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {activeTab === "manage" && (
+        <div className="amp-tab-panel">
+          <section className="amp-panel-card">
+            <div className="amp-panel-header">
+              <div>
+                <h3>Manage posts</h3>
+                <span>{totalCount} post(s)</span>
+              </div>
+
+              <button
+                type="button"
+                className="adm-secondary-btn"
+                onClick={handleRefresh}
+                disabled={loading}
+              >
+                <RefreshCw size={15} />
+                Refresh
+              </button>
+            </div>
+
+            <form className="amp-filter-bar" onSubmit={handleFilterSubmit}>
+              <label className="amp-search-box">
+                <Search size={16} />
+                <input
+                  type="text"
+                  placeholder="Search post title"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </label>
+
+              <label className="amp-filter-select">
+                <Vote size={16} />
+                <select
+                  value={electionFilter}
+                  onChange={(event) => setElectionFilter(event.target.value)}
+                >
+                  <option value="">All elections</option>
+                  {elections.map((election) => (
                     <option key={election._id} value={election._id}>
                       {election.title}
                     </option>
-                  ))
-                )}
-              </select>
-            </div>
+                  ))}
+                </select>
+              </label>
 
-            <InputField
-              label="Post Title"
-              name="title"
-              placeholder="President, General Secretary, Cultural Head"
-              value={form.title}
-              onChange={handleFormChange}
-            />
+              <label className="amp-filter-select">
+                <Filter size={16} />
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                >
+                  <option value="">All status</option>
+                  <option value="true">Active</option>
+                  <option value="false">Inactive</option>
+                </select>
+              </label>
 
-            <div className="form-field">
-              <label className="form-label">Description</label>
-              <textarea
-                className="admin-crud__textarea"
-                name="description"
-                placeholder="Provide a short description of the role or responsibility."
-                value={form.description}
-                onChange={handleFormChange}
-              />
-            </div>
+              <Button type="submit" variant="secondary" loading={loading}>
+                Apply
+              </Button>
+            </form>
 
-            <div className="admin-crud__form-grid">
-              <InputField
-                label="Max Votes Per Voter"
-                name="maxVotesPerVoter"
-                type="number"
-                min="1"
-                max="10"
-                value={form.maxVotesPerVoter}
-                onChange={handleFormChange}
-              />
-
-              <InputField
-                label="Display Order"
-                name="displayOrder"
-                type="number"
-                min="0"
-                value={form.displayOrder}
-                onChange={handleFormChange}
-              />
-            </div>
-
-            <div className="admin-crud__switch-row">
-              <div className="admin-crud__switch-copy">
-                <strong>Mark post as active</strong>
-                <span>
-                  Inactive posts remain in the system but should not appear in
-                  active voting flows.
-                </span>
+            {loading ? (
+              <div className="amp-empty-box amp-empty-box--large">
+                Loading posts...
               </div>
+            ) : posts.length ? (
+              <div className="amp-post-grid">
+                {posts.map((post) => (
+                  <PostCard key={post._id} post={post} elections={elections} />
+                ))}
+              </div>
+            ) : (
+              <div className="amp-empty-box amp-empty-box--large">
+                No posts found for current filters.
+              </div>
+            )}
 
-              <input
-                className="admin-crud__checkbox"
-                type="checkbox"
-                name="isActive"
-                checked={form.isActive}
-                onChange={handleFormChange}
-              />
-            </div>
+            {pagination && totalPages > 1 ? (
+              <div className="amp-pagination">
+                <button
+                  type="button"
+                  className="adm-secondary-btn"
+                  onClick={() => loadPosts(Math.max(currentPage - 1, 1))}
+                  disabled={!hasPrevPage || loading}
+                >
+                  Previous
+                </button>
 
-            <Button
-              className="admin-crud__submit"
-              type="submit"
-              loading={createLoading}
-            >
-              Create Post
-            </Button>
-          </form>
+                <span>
+                  Page {currentPage} of {totalPages}
+                </span>
+
+                <button
+                  type="button"
+                  className="adm-primary-btn"
+                  onClick={() =>
+                    loadPosts(Math.min(currentPage + 1, totalPages))
+                  }
+                  disabled={!hasNextPage || loading}
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
+          </section>
         </div>
-
-        <div className="admin-crud__panel">
-          <div className="admin-crud__toolbar">
-            <div className="admin-crud__toolbar-left">
-              <h3 style={{ margin: 0 }}>Posts list</h3>
-              <span className="admin-crud__meta">{totalPosts} item(s)</span>
-            </div>
-
-            <div className="admin-crud__toolbar-right">
-              <select
-                className="admin-crud__select"
-                value={activeFilter}
-                onChange={(event) => setActiveFilter(event.target.value)}
-                style={{ minWidth: 150 }}
-              >
-                <option value="">All posts</option>
-                <option value="active">Active only</option>
-                <option value="inactive">Inactive only</option>
-              </select>
-            </div>
-          </div>
-
-          {!selectedElectionId ? (
-            <div className="admin-crud__empty">
-              <p>Please select an election to view and manage its posts.</p>
-            </div>
-          ) : loadingPosts ? (
-            <div className="admin-crud__empty">
-              <p>Loading posts...</p>
-            </div>
-          ) : posts.length === 0 ? (
-            <div className="admin-crud__empty">
-              <p>No posts are available for the selected election.</p>
-            </div>
-          ) : (
-            <div className="admin-crud__list">
-              {posts.map((post) => (
-                <article key={post._id} className="admin-crud__card">
-                  <div className="admin-crud__card-top">
-                    <div className="admin-crud__title-stack">
-                      <h4>{post.title}</h4>
-                      <p>{post.description || "No description provided."}</p>
-                    </div>
-
-                    <span
-                      className={`admin-crud__status ${
-                        post.isActive
-                          ? "admin-crud__status--active"
-                          : "admin-crud__status--inactive"
-                      }`}
-                    >
-                      {post.isActive ? "Active" : "Inactive"}
-                    </span>
-                  </div>
-
-                  <div className="admin-crud__chips">
-                    <span className="admin-crud__chip">
-                      <Vote size={14} />
-                      Max votes: {post.maxVotesPerVoter}
-                    </span>
-                    <span className="admin-crud__chip">
-                      <ListOrdered size={14} />
-                      Display order: {post.displayOrder ?? 0}
-                    </span>
-                    <span className="admin-crud__chip">
-                      Election: {selectedElection?.title || "Unknown"}
-                    </span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      )}
     </section>
   );
 }

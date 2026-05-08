@@ -6,12 +6,18 @@ import {
   ArrowRight,
   BadgeCheck,
   BarChart3,
+  CalendarClock,
+  CheckCircle2,
   Clock3,
+  FileBarChart2,
+  LayoutDashboard,
+  PieChart as PieChartIcon,
   Shield,
+  TrendingUp,
+  Trophy,
+  UserCheck,
   Users,
   Vote,
-  UserCheck,
-  AlertTriangle,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -34,51 +40,127 @@ import { adminService } from "../../services/admin.service";
 import { APP_ROUTES } from "../../lib/routes";
 import { getApiErrorMessage } from "../../lib/utils";
 import "../../styles/dashboard.css";
+import "../../styles/admin-light-theme.css";
 
 const CHART_COLORS = [
-  "#6d72ff",
-  "#13c8e6",
-  "#22c55e",
+  "#247a52",
+  "#6750a4",
   "#f59e0b",
-  "#ef4444",
-  "#a855f7",
+  "#ba3545",
+  "#2f9d68",
+  "#8b6fc8",
+];
+
+const tabs = [
+  { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "analytics", label: "Analytics", icon: BarChart3 },
+  { id: "activity", label: "Activity", icon: Activity },
 ];
 
 const safeNumber = (value) => Number(value || 0);
 
-const getStatusToneClass = (status) => {
+function formatNumber(value) {
+  return new Intl.NumberFormat("en-IN").format(safeNumber(value));
+}
+
+function formatDateTime(value) {
+  if (!value) return "-";
+
+  try {
+    return new Intl.DateTimeFormat("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return "-";
+  }
+}
+
+function formatStatus(value = "unknown") {
+  return String(value)
+    .replaceAll("_", " ")
+    .replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function getStatusClass(status) {
   const value = String(status || "").toLowerCase();
 
-  if (value === "active") return "admin-status-pill admin-status-pill--active";
-  if (value === "ended") return "admin-status-pill admin-status-pill--ended";
-  return "admin-status-pill admin-status-pill--upcoming";
-};
+  if (value === "active") return "adm-status adm-status--green";
+  if (value === "ended") return "adm-status adm-status--purple";
+  if (value === "approved") return "adm-status adm-status--green";
+  if (value === "pending") return "adm-status adm-status--amber";
+  if (value === "rejected") return "adm-status adm-status--red";
 
-const formatVerificationLabel = (status) => {
-  const value = String(status || "unknown").replaceAll("_", " ");
-  return value.charAt(0).toUpperCase() + value.slice(1);
-};
+  return "adm-status";
+}
 
-function StatCard({ label, value, meta, icon: Icon, tone }) {
+function getAuditActor(log) {
   return (
-    <article className={`admin-stat-card admin-stat-card--${tone}`}>
-      <div className="admin-stat-card__top">
-        <div>
-          <p className="admin-stat-card__label">{label}</p>
-          <h3 className="admin-stat-card__value">{value}</h3>
-        </div>
+    log?.actorId?.fullName ||
+    log?.performedBy?.fullName ||
+    log?.actorRole ||
+    "System"
+  );
+}
 
-        <div className="admin-stat-card__icon">
-          <Icon size={20} />
-        </div>
+function MetricCard({ label, value, helper, icon: Icon, tone = "green" }) {
+  return (
+    <article className={`adm-metric-card adm-metric-card--${tone}`}>
+      <div className="adm-metric-card__icon">
+        <Icon size={20} />
       </div>
 
-      <p className="admin-stat-card__meta">{meta}</p>
+      <div>
+        <span>{label}</span>
+        <strong>{formatNumber(value)}</strong>
+        {helper ? <p>{helper}</p> : null}
+      </div>
     </article>
   );
 }
 
+function QuickAction({ to, icon: Icon, title, label }) {
+  return (
+    <Link to={to} className="adm-action-card">
+      <div className="adm-action-card__icon">
+        <Icon size={19} />
+      </div>
+
+      <div>
+        <strong>{title}</strong>
+        <span>{label}</span>
+      </div>
+
+      <ArrowRight size={17} />
+    </Link>
+  );
+}
+
+function ChartCard({ title, label, icon: Icon, children }) {
+  return (
+    <article className="adm-chart-card">
+      <div className="adm-card-header">
+        <div>
+          <h3>{title}</h3>
+          <span>{label}</span>
+        </div>
+
+        <div className="adm-card-header__icon">
+          <Icon size={18} />
+        </div>
+      </div>
+
+      <div className="adm-chart-card__body">{children}</div>
+    </article>
+  );
+}
+
+function EmptyBox({ text }) {
+  return <div className="adm-empty-box">{text}</div>;
+}
+
 export default function AdminDashboardPage() {
+  const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
 
@@ -86,6 +168,7 @@ export default function AdminDashboardPage() {
     const loadDashboard = async () => {
       try {
         setLoading(true);
+
         const data = await adminService.getDashboardSummary();
         setSummary(data || null);
       } catch (error) {
@@ -118,19 +201,20 @@ export default function AdminDashboardPage() {
 
   const verificationChartData = useMemo(() => {
     return verificationBreakdown.map((item) => ({
-      label: formatVerificationLabel(item?.status),
+      label: formatStatus(item?.status),
       value: safeNumber(item?.count),
     }));
   }, [verificationBreakdown]);
 
   const electionChartData = useMemo(() => {
-    return elections.map((item, index) => ({
-      shortTitle:
-        String(item?.title || `Election ${index + 1}`).length > 16
-          ? `${String(item?.title).slice(0, 16)}...`
-          : String(item?.title || `Election ${index + 1}`),
-      totalVotes: safeNumber(item?.totalVotes),
-    }));
+    return elections.map((item, index) => {
+      const title = String(item?.title || `Election ${index + 1}`);
+
+      return {
+        shortTitle: title.length > 14 ? `${title.slice(0, 14)}...` : title,
+        totalVotes: safeNumber(item?.totalVotes),
+      };
+    });
   }, [elections]);
 
   const operationalTrendData = useMemo(() => {
@@ -150,569 +234,516 @@ export default function AdminDashboardPage() {
     }));
   }, [voteTrendChartData, verificationChartData]);
 
-  const latestAuditLogs = useMemo(() => auditLogs.slice(0, 5), [auditLogs]);
   const topElections = useMemo(() => elections.slice(0, 5), [elections]);
+  const latestAuditLogs = useMemo(() => auditLogs.slice(0, 6), [auditLogs]);
 
   const maxElectionVotes = useMemo(() => {
     return Math.max(
-      ...topElections.map((item) => safeNumber(item?.totalVotes)),
+      ...topElections.map((election) => safeNumber(election?.totalVotes)),
       1,
     );
   }, [topElections]);
 
+  const approvalRate = useMemo(() => {
+    const totalVoters = safeNumber(stats.totalVoters);
+    const verifiedVoters = safeNumber(stats.verifiedVoters);
+
+    if (!totalVoters) return 0;
+
+    return Math.round((verifiedVoters / totalVoters) * 100);
+  }, [stats.totalVoters, stats.verifiedVoters]);
+
+  if (loading) {
+    return (
+      <section className="adm-dashboard-page">
+        <div className="adm-skeleton adm-skeleton--hero" />
+        <div className="adm-metric-grid">
+          <div className="adm-skeleton adm-skeleton--card" />
+          <div className="adm-skeleton adm-skeleton--card" />
+          <div className="adm-skeleton adm-skeleton--card" />
+          <div className="adm-skeleton adm-skeleton--card" />
+        </div>
+        <div className="adm-skeleton adm-skeleton--panel" />
+      </section>
+    );
+  }
+
   return (
-    <section className="admin-dashboard">
-      {loading ? (
-        <>
-          <div className="admin-skeleton admin-skeleton--hero" />
-          <div className="admin-dashboard__stats">
-            <div className="admin-skeleton admin-skeleton--card" />
-            <div className="admin-skeleton admin-skeleton--card" />
-            <div className="admin-skeleton admin-skeleton--card" />
-            <div className="admin-skeleton admin-skeleton--card" />
+    <section className="adm-dashboard-page">
+      <section className="adm-dashboard-hero">
+        <div>
+          <span className="adm-eyebrow">
+            <Shield size={15} />
+            Admin overview
+          </span>
+
+          <h2>Control voting operations with a cleaner dashboard.</h2>
+
+          <div className="adm-hero-actions">
+            <Link className="adm-primary-btn" to={APP_ROUTES.ADMIN_ELECTIONS}>
+              Manage Elections
+              <ArrowRight size={16} />
+            </Link>
+
+            <Link className="adm-secondary-btn" to={APP_ROUTES.ADMIN_RESULTS}>
+              View Analytics
+            </Link>
           </div>
-          <div className="admin-dashboard__grid">
-            <div className="admin-skeleton admin-skeleton--panel" />
-            <div className="admin-skeleton admin-skeleton--panel" />
-            <div className="admin-skeleton admin-skeleton--panel-wide" />
+        </div>
+
+        <div className="adm-hero-summary">
+          <div>
+            <span>Total Votes</span>
+            <strong>{formatNumber(stats.totalVotes)}</strong>
           </div>
-        </>
-      ) : (
-        <>
-          <section className="admin-dashboard__hero">
-            <div className="admin-dashboard__hero-copy">
-              <span className="admin-dashboard__hero-badge">
-                <Shield size={15} />
-                Administrative overview
-              </span>
 
-              <h2>
-                Monitor election performance, voter verification, and
-                administrative activity from one dashboard.
-              </h2>
+          <div>
+            <span>Approval Rate</span>
+            <strong>{approvalRate}%</strong>
+          </div>
 
-              <p>
-                This dashboard provides a consolidated operational summary of
-                the platform, including election participation, voter
-                verification distribution, and recent administrative events.
-              </p>
+          <div>
+            <span>Active Elections</span>
+            <strong>{formatNumber(stats.activeElections)}</strong>
+          </div>
+        </div>
+      </section>
 
-              <div className="admin-dashboard__hero-actions">
-                <Link
-                  className="admin-cta-btn admin-cta-btn--primary"
-                  to={APP_ROUTES.ADMIN_ELECTIONS}
-                >
-                  Manage Elections
-                  <ArrowRight size={16} />
-                </Link>
+      <div className="adm-tabs" role="tablist" aria-label="Dashboard sections">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
 
-                <Link
-                  className="admin-cta-btn admin-cta-btn--secondary"
-                  to={APP_ROUTES.ADMIN_RESULTS}
-                >
-                  Open Results Analytics
-                </Link>
-              </div>
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              className={activeTab === tab.id ? "is-active" : ""}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <Icon size={16} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-              <div className="admin-dashboard__quick-metrics">
-                <span className="admin-quick-chip">
-                  <Vote size={15} />
-                  Total votes: {safeNumber(stats.totalVotes)}
-                </span>
-
-                <span className="admin-quick-chip">
-                  <Users size={15} />
-                  Total voters: {safeNumber(stats.totalVoters)}
-                </span>
-
-                <span className="admin-quick-chip">
-                  <BadgeCheck size={15} />
-                  Active elections: {safeNumber(stats.activeElections)}
-                </span>
-              </div>
-            </div>
-
-            <div className="admin-dashboard__hero-grid">
-              <div className="admin-hero-mini-card">
-                <span>Total elections</span>
-                <strong>{safeNumber(stats.totalElections)}</strong>
-              </div>
-
-              <div className="admin-hero-mini-card">
-                <span>Total voters</span>
-                <strong>{safeNumber(stats.totalVoters)}</strong>
-              </div>
-
-              <div className="admin-hero-mini-card">
-                <span>Pending approvals</span>
-                <strong>{safeNumber(stats.pendingVoters)}</strong>
-              </div>
-
-              <div className="admin-hero-mini-card">
-                <span>Total admins</span>
-                <strong>{safeNumber(stats.totalAdmins)}</strong>
-              </div>
-            </div>
-          </section>
-
-          <section className="admin-dashboard__stats">
-            <StatCard
-              label="Total Elections"
-              value={safeNumber(stats.totalElections)}
-              meta="All elections currently registered in the system."
+      {activeTab === "overview" && (
+        <div className="adm-tab-panel">
+          <div className="adm-metric-grid">
+            <MetricCard
+              label="Elections"
+              value={stats.totalElections}
+              helper={`${formatNumber(stats.activeElections)} active now`}
               icon={Vote}
-              tone="primary"
-            />
-
-            <StatCard
-              label="Active Elections"
-              value={safeNumber(stats.activeElections)}
-              meta="Elections currently open for participation."
-              icon={BadgeCheck}
-              tone="cyan"
-            />
-
-            <StatCard
-              label="Verified Voters"
-              value={safeNumber(stats.verifiedVoters)}
-              meta="Voter accounts that have completed approval requirements."
-              icon={UserCheck}
               tone="green"
             />
 
-            <StatCard
-              label="Pending Voters"
-              value={safeNumber(stats.pendingVoters)}
-              meta="Accounts currently waiting for administrative review."
-              icon={Clock3}
+            <MetricCard
+              label="Voters"
+              value={stats.totalVoters}
+              helper={`${formatNumber(stats.pendingVoters)} pending`}
+              icon={Users}
+              tone="purple"
+            />
+
+            <MetricCard
+              label="Verified"
+              value={stats.verifiedVoters}
+              helper={`${approvalRate}% approval rate`}
+              icon={UserCheck}
               tone="amber"
             />
-          </section>
 
-          <section className="admin-dashboard__grid">
-            <article className="admin-panel admin-panel--tall">
-              <div className="admin-panel__header">
+            <MetricCard
+              label="Candidates"
+              value={stats.totalCandidates}
+              helper={`${formatNumber(stats.approvedCandidates)} approved`}
+              icon={BadgeCheck}
+              tone="rose"
+            />
+          </div>
+
+          <div className="adm-overview-grid">
+            <article className="adm-panel-card">
+              <div className="adm-card-header">
                 <div>
-                  <h3>Vote Trend Overview</h3>
-                  <p>Track voting activity across recent reporting dates.</p>
+                  <h3>Quick actions</h3>
+                  <span>Most used admin operations</span>
                 </div>
-                <span className="admin-panel__pill">Trend</span>
-              </div>
 
-              <div className="admin-panel__body">
-                {voteTrendChartData.length ? (
-                  <div className="admin-chart admin-chart--md">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={voteTrendChartData}>
-                        <defs>
-                          <linearGradient
-                            id="votesArea"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="5%"
-                              stopColor="#6d72ff"
-                              stopOpacity={0.45}
-                            />
-                            <stop
-                              offset="95%"
-                              stopColor="#6d72ff"
-                              stopOpacity={0.04}
-                            />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="rgba(255,255,255,0.08)"
-                        />
-                        <XAxis dataKey="label" stroke="#8fa3bc" />
-                        <YAxis stroke="#8fa3bc" />
-                        <Tooltip />
-                        <Area
-                          type="monotone"
-                          dataKey="votes"
-                          stroke="#6d72ff"
-                          fillOpacity={1}
-                          fill="url(#votesArea)"
-                          strokeWidth={3}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="admin-empty-state">
-                    <p>No vote trend data is available yet.</p>
-                  </div>
-                )}
-              </div>
-            </article>
-
-            <article className="admin-panel admin-panel--tall">
-              <div className="admin-panel__header">
-                <div>
-                  <h3>Verification Breakdown</h3>
-                  <p>Review voter verification states across the platform.</p>
+                <div className="adm-card-header__icon">
+                  <ArrowRight size={18} />
                 </div>
-                <span className="admin-panel__pill">Distribution</span>
               </div>
 
-              <div className="admin-panel__body">
-                {verificationChartData.length ? (
-                  <>
-                    <div className="admin-chart admin-chart--md">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={verificationChartData}
-                            dataKey="value"
-                            nameKey="label"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={100}
-                            innerRadius={58}
-                          >
-                            {verificationChartData.map((entry, index) => (
-                              <Cell
-                                key={`${entry.label}-${index}`}
-                                fill={CHART_COLORS[index % CHART_COLORS.length]}
-                              />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
+              <div className="adm-action-grid">
+                <QuickAction
+                  to={APP_ROUTES.ADMIN_ELECTIONS}
+                  icon={Vote}
+                  title="Elections"
+                  label="Create or publish"
+                />
 
-                    <div className="admin-legend-list">
-                      {verificationChartData.map((entry, index) => (
-                        <div key={entry.label} className="admin-legend-item">
-                          <span
-                            className="admin-legend-item__dot"
-                            style={{
-                              background:
-                                CHART_COLORS[index % CHART_COLORS.length],
-                            }}
-                          />
-                          <span className="admin-legend-item__label">
-                            {entry.label}
-                          </span>
-                          <strong className="admin-legend-item__value">
-                            {entry.value}
-                          </strong>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <div className="admin-empty-state">
-                    <p>No verification breakdown data is available yet.</p>
-                  </div>
-                )}
-              </div>
-            </article>
+                <QuickAction
+                  to={APP_ROUTES.ADMIN_VOTERS}
+                  icon={Users}
+                  title="Voters"
+                  label="Approve pending"
+                />
 
-            <article className="admin-panel">
-              <div className="admin-panel__header">
-                <div>
-                  <h3>Election Comparison</h3>
-                  <p>Compare visible vote totals across the top elections.</p>
-                </div>
-                <span className="admin-panel__pill">
-                  <BarChart3 size={14} />
-                </span>
-              </div>
+                <QuickAction
+                  to={APP_ROUTES.ADMIN_CANDIDATES}
+                  icon={BadgeCheck}
+                  title="Candidates"
+                  label="Review approvals"
+                />
 
-              <div className="admin-panel__body">
-                {electionChartData.length ? (
-                  <div className="admin-chart admin-chart--lg">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={electionChartData}>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="rgba(255,255,255,0.08)"
-                        />
-                        <XAxis dataKey="shortTitle" stroke="#8fa3bc" />
-                        <YAxis stroke="#8fa3bc" />
-                        <Tooltip />
-                        <Legend />
-                        <Bar
-                          dataKey="totalVotes"
-                          fill="#13c8e6"
-                          radius={[8, 8, 0, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="admin-empty-state">
-                    <p>No election comparison data is available yet.</p>
-                  </div>
-                )}
-              </div>
-            </article>
-
-            <article className="admin-panel">
-              <div className="admin-panel__header">
-                <div>
-                  <h3>Operational Comparison</h3>
-                  <p>Compare recent vote counts with verification counts.</p>
-                </div>
-                <span className="admin-panel__pill">
-                  <Activity size={14} />
-                </span>
-              </div>
-
-              <div className="admin-panel__body">
-                {operationalTrendData.length ? (
-                  <div className="admin-chart admin-chart--lg">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={operationalTrendData}>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="rgba(255,255,255,0.08)"
-                        />
-                        <XAxis dataKey="label" stroke="#8fa3bc" />
-                        <YAxis stroke="#8fa3bc" />
-                        <Tooltip />
-                        <Legend />
-                        <Line
-                          type="monotone"
-                          dataKey="votes"
-                          stroke="#6d72ff"
-                          strokeWidth={3}
-                          dot={{ r: 4 }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="approvals"
-                          stroke="#22c55e"
-                          strokeWidth={3}
-                          dot={{ r: 4 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="admin-empty-state">
-                    <p>No operational comparison data is available yet.</p>
-                  </div>
-                )}
-              </div>
-            </article>
-
-            <article className="admin-panel">
-              <div className="admin-panel__header">
-                <div>
-                  <h3>Top Elections by Activity</h3>
-                  <p>Review elections with the highest recorded vote volume.</p>
-                </div>
-                <Link
+                <QuickAction
                   to={APP_ROUTES.ADMIN_RESULTS}
-                  className="admin-panel__pill"
-                >
-                  Results
-                </Link>
-              </div>
-
-              <div className="admin-panel__body">
-                {topElections.length ? (
-                  <div className="admin-election-list">
-                    {topElections.map((election, index) => {
-                      const votes = safeNumber(election?.totalVotes);
-                      const width = `${(votes / maxElectionVotes) * 100}%`;
-
-                      return (
-                        <article
-                          key={
-                            election.electionId || `${election.title}-${index}`
-                          }
-                          className="admin-election-list__item"
-                        >
-                          <div className="admin-election-list__rank">
-                            {index + 1}
-                          </div>
-
-                          <div className="admin-election-list__content">
-                            <div className="admin-election-list__top">
-                              <h4>{election?.title || "Election"}</h4>
-                              <span className="admin-election-list__votes">
-                                {votes} votes
-                              </span>
-                            </div>
-
-                            <div className="admin-election-list__meta">
-                              <span
-                                className={getStatusToneClass(election?.status)}
-                              >
-                                {election?.status || "upcoming"}
-                              </span>
-                            </div>
-
-                            <div className="admin-progress">
-                              <div
-                                className="admin-progress__bar"
-                                style={{ width }}
-                              />
-                            </div>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="admin-empty-state">
-                    <p>No election activity data is available yet.</p>
-                  </div>
-                )}
+                  icon={Trophy}
+                  title="Results"
+                  label="Open analytics"
+                />
               </div>
             </article>
 
-            <article className="admin-panel">
-              <div className="admin-panel__header">
+            <article className="adm-panel-card">
+              <div className="adm-card-header">
                 <div>
-                  <h3>Recent Administrative Actions</h3>
-                  <p>
-                    Track the most recent audit events recorded by the system.
-                  </p>
+                  <h3>Election status</h3>
+                  <span>Current lifecycle counts</span>
                 </div>
-                <Link
-                  to={APP_ROUTES.ADMIN_SYSTEM}
-                  className="admin-panel__pill"
-                >
-                  Audit Log
-                </Link>
+
+                <div className="adm-card-header__icon">
+                  <CalendarClock size={18} />
+                </div>
               </div>
 
-              <div className="admin-panel__body">
-                {latestAuditLogs.length ? (
-                  <div className="admin-audit-list">
-                    {latestAuditLogs.map((log, index) => (
-                      <article
-                        key={log._id || `${log.action}-${index}`}
-                        className="admin-audit-item"
-                      >
-                        <div className="admin-audit-item__marker" />
+              <div className="adm-status-stack">
+                <div className="adm-status-row">
+                  <span>Upcoming</span>
+                  <strong>{formatNumber(stats.upcomingElections)}</strong>
+                </div>
 
-                        <div className="admin-audit-item__body">
-                          <div className="admin-audit-item__top">
-                            <h4>{log?.action || "Administrative action"}</h4>
-                            <span>
-                              {log?.createdAt
-                                ? new Date(log.createdAt).toLocaleString()
-                                : "-"}
-                            </span>
-                          </div>
+                <div className="adm-status-row">
+                  <span>Active</span>
+                  <strong>{formatNumber(stats.activeElections)}</strong>
+                </div>
 
-                          <p className="admin-audit-item__desc">
-                            {log?.description ||
-                              "No description available for this event."}
-                          </p>
+                <div className="adm-status-row">
+                  <span>Ended</span>
+                  <strong>{formatNumber(stats.endedElections)}</strong>
+                </div>
 
-                          <div className="admin-audit-item__meta">
-                            <span className="admin-role-chip">
-                              <Shield size={13} />
-                              {log?.actorId?.role || "system"}
-                            </span>
+                <div className="adm-status-row">
+                  <span>Total posts</span>
+                  <strong>{formatNumber(stats.totalPosts)}</strong>
+                </div>
+              </div>
+            </article>
+          </div>
 
-                            <span>{log?.actorId?.fullName || "System"}</span>
-                          </div>
+          <article className="adm-panel-card">
+            <div className="adm-card-header">
+              <div>
+                <h3>Top elections</h3>
+                <span>Highest vote activity</span>
+              </div>
+
+              <Link className="adm-mini-link" to={APP_ROUTES.ADMIN_RESULTS}>
+                Results
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+
+            {topElections.length ? (
+              <div className="adm-election-list">
+                {topElections.map((election, index) => {
+                  const votes = safeNumber(election?.totalVotes);
+                  const width = `${(votes / maxElectionVotes) * 100}%`;
+
+                  return (
+                    <article
+                      key={election.electionId || `${election.title}-${index}`}
+                      className="adm-election-row"
+                    >
+                      <div className="adm-rank">{index + 1}</div>
+
+                      <div className="adm-election-row__main">
+                        <div className="adm-election-row__top">
+                          <h4>{election?.title || "Election"}</h4>
+                          <span>{formatNumber(votes)} votes</span>
                         </div>
-                      </article>
+
+                        <div className="adm-progress">
+                          <div style={{ width }} />
+                        </div>
+                      </div>
+
+                      <span className={getStatusClass(election?.status)}>
+                        {formatStatus(election?.status)}
+                      </span>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <EmptyBox text="No election activity yet." />
+            )}
+          </article>
+        </div>
+      )}
+
+      {activeTab === "analytics" && (
+        <div className="adm-tab-panel">
+          <div className="adm-chart-grid">
+            <ChartCard
+              title="Vote trend"
+              label="Recent voting activity"
+              icon={TrendingUp}
+            >
+              {voteTrendChartData.length ? (
+                <div className="adm-chart-box adm-chart-box--medium">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={voteTrendChartData}>
+                      <defs>
+                        <linearGradient
+                          id="admVotesArea"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="#247a52"
+                            stopOpacity={0.35}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="#247a52"
+                            stopOpacity={0.04}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#eadfce" />
+                      <XAxis dataKey="label" stroke="#6b7280" />
+                      <YAxis stroke="#6b7280" />
+                      <Tooltip />
+                      <Area
+                        type="monotone"
+                        dataKey="votes"
+                        stroke="#247a52"
+                        fill="url(#admVotesArea)"
+                        strokeWidth={3}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <EmptyBox text="No vote trend data available." />
+              )}
+            </ChartCard>
+
+            <ChartCard
+              title="Voter verification"
+              label="Approval distribution"
+              icon={PieChartIcon}
+            >
+              {verificationChartData.length ? (
+                <>
+                  <div className="adm-chart-box adm-chart-box--medium">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={verificationChartData}
+                          dataKey="value"
+                          nameKey="label"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={92}
+                          innerRadius={56}
+                        >
+                          {verificationChartData.map((entry, index) => (
+                            <Cell
+                              key={`${entry.label}-${index}`}
+                              fill={CHART_COLORS[index % CHART_COLORS.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="adm-chart-legend">
+                    {verificationChartData.map((entry, index) => (
+                      <div key={entry.label}>
+                        <span
+                          style={{
+                            background:
+                              CHART_COLORS[index % CHART_COLORS.length],
+                          }}
+                        />
+                        <strong>{entry.label}</strong>
+                        <em>{formatNumber(entry.value)}</em>
+                      </div>
                     ))}
                   </div>
-                ) : (
-                  <div className="admin-empty-state">
-                    <p>No recent audit entries are available.</p>
-                  </div>
-                )}
-              </div>
-            </article>
+                </>
+              ) : (
+                <EmptyBox text="No verification data available." />
+              )}
+            </ChartCard>
 
-            <article className="admin-panel">
-              <div className="admin-panel__header">
+            <ChartCard
+              title="Election comparison"
+              label="Votes by election"
+              icon={BarChart3}
+            >
+              {electionChartData.length ? (
+                <div className="adm-chart-box adm-chart-box--large">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={electionChartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#eadfce" />
+                      <XAxis dataKey="shortTitle" stroke="#6b7280" />
+                      <YAxis stroke="#6b7280" />
+                      <Tooltip />
+                      <Legend />
+                      <Bar
+                        dataKey="totalVotes"
+                        fill="#6750a4"
+                        radius={[10, 10, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <EmptyBox text="No election comparison data available." />
+              )}
+            </ChartCard>
+
+            <ChartCard
+              title="Operational comparison"
+              label="Votes vs approvals"
+              icon={FileBarChart2}
+            >
+              {operationalTrendData.length ? (
+                <div className="adm-chart-box adm-chart-box--large">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={operationalTrendData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#eadfce" />
+                      <XAxis dataKey="label" stroke="#6b7280" />
+                      <YAxis stroke="#6b7280" />
+                      <Tooltip />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="votes"
+                        stroke="#247a52"
+                        strokeWidth={3}
+                        dot={{ r: 4 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="approvals"
+                        stroke="#f59e0b"
+                        strokeWidth={3}
+                        dot={{ r: 4 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <EmptyBox text="No operational comparison data available." />
+              )}
+            </ChartCard>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "activity" && (
+        <div className="adm-tab-panel">
+          <div className="adm-overview-grid">
+            <article className="adm-panel-card">
+              <div className="adm-card-header">
                 <div>
-                  <h3>Operational Summary</h3>
-                  <p>Key platform counts for administration and monitoring.</p>
+                  <h3>Recent audit logs</h3>
+                  <span>Latest recorded admin actions</span>
                 </div>
-                <span className="admin-panel__pill">
-                  <AlertTriangle size={14} />
-                </span>
+
+                <Link className="adm-mini-link" to={APP_ROUTES.ADMIN_SYSTEM}>
+                  View all
+                  <ArrowRight size={14} />
+                </Link>
               </div>
 
-              <div className="admin-panel__body">
-                <div className="admin-legend-list">
-                  <div className="admin-legend-item">
-                    <span
-                      className="admin-legend-item__dot"
-                      style={{ background: "#6d72ff" }}
-                    />
-                    <span className="admin-legend-item__label">
-                      Total votes cast
-                    </span>
-                    <strong className="admin-legend-item__value">
-                      {safeNumber(stats.totalVotes)}
-                    </strong>
-                  </div>
+              {latestAuditLogs.length ? (
+                <div className="adm-audit-list">
+                  {latestAuditLogs.map((log, index) => (
+                    <article
+                      key={log._id || `${log.action}-${index}`}
+                      className="adm-audit-row"
+                    >
+                      <div className="adm-audit-row__icon">
+                        <Activity size={15} />
+                      </div>
 
-                  <div className="admin-legend-item">
-                    <span
-                      className="admin-legend-item__dot"
-                      style={{ background: "#13c8e6" }}
-                    />
-                    <span className="admin-legend-item__label">
-                      Active admins
-                    </span>
-                    <strong className="admin-legend-item__value">
-                      {safeNumber(stats.activeAdmins)}
-                    </strong>
-                  </div>
+                      <div>
+                        <h4>{log?.action || "System action"}</h4>
+                        <p>{getAuditActor(log)}</p>
+                      </div>
 
-                  <div className="admin-legend-item">
-                    <span
-                      className="admin-legend-item__dot"
-                      style={{ background: "#22c55e" }}
-                    />
-                    <span className="admin-legend-item__label">
-                      Approved candidates
-                    </span>
-                    <strong className="admin-legend-item__value">
-                      {safeNumber(stats.approvedCandidates)}
-                    </strong>
-                  </div>
+                      <span>{formatDateTime(log?.createdAt)}</span>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <EmptyBox text="No audit logs available." />
+              )}
+            </article>
 
-                  <div className="admin-legend-item">
-                    <span
-                      className="admin-legend-item__dot"
-                      style={{ background: "#f59e0b" }}
-                    />
-                    <span className="admin-legend-item__label">
-                      Pending voters
-                    </span>
-                    <strong className="admin-legend-item__value">
-                      {safeNumber(stats.pendingVoters)}
-                    </strong>
-                  </div>
+            <article className="adm-panel-card">
+              <div className="adm-card-header">
+                <div>
+                  <h3>Operational summary</h3>
+                  <span>Quick platform health</span>
+                </div>
 
-                  <div className="admin-legend-item">
-                    <span
-                      className="admin-legend-item__dot"
-                      style={{ background: "#ef4444" }}
-                    />
-                    <span className="admin-legend-item__label">
-                      Rejected voters
-                    </span>
-                    <strong className="admin-legend-item__value">
-                      {safeNumber(stats.rejectedVoters)}
-                    </strong>
-                  </div>
+                <div className="adm-card-header__icon">
+                  <CheckCircle2 size={18} />
+                </div>
+              </div>
+
+              <div className="adm-status-stack">
+                <div className="adm-status-row">
+                  <span>Total votes</span>
+                  <strong>{formatNumber(stats.totalVotes)}</strong>
+                </div>
+
+                <div className="adm-status-row">
+                  <span>Active admins</span>
+                  <strong>{formatNumber(stats.activeAdmins)}</strong>
+                </div>
+
+                <div className="adm-status-row">
+                  <span>Super admins</span>
+                  <strong>{formatNumber(stats.activeSuperAdmins)}</strong>
+                </div>
+
+                <div className="adm-status-row">
+                  <span>Recent audit events</span>
+                  <strong>{formatNumber(stats.recentAuditCount)}</strong>
+                </div>
+
+                <div className="adm-status-row">
+                  <span>Rejected voters</span>
+                  <strong>{formatNumber(stats.rejectedVoters)}</strong>
                 </div>
               </div>
             </article>
-          </section>
-        </>
+          </div>
+        </div>
       )}
     </section>
   );

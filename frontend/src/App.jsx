@@ -14,8 +14,11 @@ import "./styles/system-control.css";
 import "./styles/voter-clean-pages.css";
 
 // Final safe override for voter bell + public chat UI.
-// Keep this import LAST so it wins over older voter.css override blocks.
 import "./styles/voter-center-polish.css";
+
+// Final safe override for admin/super-admin light UI.
+// Keep this LAST so it overrides old dark admin theme and inline-heavy styles.
+import "./styles/admin-light-theme.css";
 
 export default function App() {
   return (
