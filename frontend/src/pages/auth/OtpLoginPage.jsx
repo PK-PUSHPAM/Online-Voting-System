@@ -1,27 +1,35 @@
-import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import { KeyRound, ShieldCheck, Smartphone, Info } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Fingerprint,
+  MailCheck,
+  RefreshCw,
+  ShieldCheck,
+} from "lucide-react";
 import AuthLayout from "../../components/layout/AuthLayout";
 import InputField from "../../components/common/InputField";
 import Button from "../../components/common/Button";
 import { authService } from "../../services/auth.service";
+import { useAuth } from "../../hooks/useAuth";
 import { APP_ROUTES } from "../../lib/routes";
 import { getApiErrorMessage } from "../../lib/utils";
 import "../../styles/auth-pages.css";
 
 const initialForm = {
-  mobileNumber: "",
+  emailOrMobile: "",
   otp: "",
 };
 
 export default function OtpLoginPage() {
   const navigate = useNavigate();
+  const { verifyOtpLogin, isAuthActionLoading } = useAuth();
 
   const [form, setForm] = useState(initialForm);
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [submitLoading, setSubmitLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -33,10 +41,8 @@ export default function OtpLoginPage() {
   };
 
   const handleSendOtp = async () => {
-    const mobileNumber = form.mobileNumber.trim();
-
-    if (!/^[6-9]\d{9}$/.test(mobileNumber)) {
-      toast.error("Please enter a valid 10-digit mobile number.");
+    if (!form.emailOrMobile.trim()) {
+      toast.error("Enter email or mobile number.");
       return;
     }
 
@@ -44,7 +50,7 @@ export default function OtpLoginPage() {
       setOtpLoading(true);
 
       await authService.sendOtp({
-        mobileNumber,
+        emailOrMobile: form.emailOrMobile.trim(),
         purpose: "login",
       });
 
@@ -60,30 +66,25 @@ export default function OtpLoginPage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const mobileNumber = form.mobileNumber.trim();
-    const otp = form.otp.trim();
-
-    if (!/^[6-9]\d{9}$/.test(mobileNumber)) {
-      toast.error("Please enter a valid 10-digit mobile number.");
+    if (!form.emailOrMobile.trim()) {
+      toast.error("Enter email or mobile number.");
       return;
     }
 
-    if (!/^\d{4,6}$/.test(otp)) {
-      toast.error("Please enter a valid OTP.");
+    if (!/^\d{4,6}$/.test(form.otp.trim())) {
+      toast.error("Enter a valid OTP.");
       return;
     }
 
     try {
-      setSubmitLoading(true);
-
-      const response = await authService.loginWithOtp({
-        mobileNumber,
-        otp,
+      const data = await verifyOtpLogin({
+        emailOrMobile: form.emailOrMobile.trim(),
+        otp: form.otp.trim(),
       });
 
       toast.success("Signed in successfully.");
 
-      const role = String(response?.user?.role || "").toLowerCase();
+      const role = String(data?.user?.role || "").toLowerCase();
 
       if (role === "admin" || role === "super_admin" || role === "superadmin") {
         navigate(APP_ROUTES.ADMIN_DASHBOARD);
@@ -93,119 +94,87 @@ export default function OtpLoginPage() {
       navigate(APP_ROUTES.VOTER_DASHBOARD);
     } catch (error) {
       toast.error(getApiErrorMessage(error));
-    } finally {
-      setSubmitLoading(false);
     }
   };
 
   return (
     <AuthLayout
-      title="Login with OTP"
-      subtitle="Use your registered mobile number to request a one-time passcode and sign in securely."
-      badge="Passwordless Sign-In"
+      title="OTP login"
+      subtitle="Enter your registered email/mobile and verify OTP."
+      badge="Quick Access"
     >
-      <form className="auth-form" onSubmit={handleSubmit}>
-        <div className="auth-form__meta-strip">
-          <div className="auth-form__meta-card">
-            <span>Primary factor</span>
-            <strong>Registered mobile number</strong>
+      <form className="auth-mini-form" onSubmit={handleSubmit}>
+        <div className="auth-mini-card">
+          <div className="auth-mini-card__icon">
+            <Fingerprint size={21} />
           </div>
 
-          <div className="auth-form__meta-card">
-            <span>OTP validity</span>
-            <strong>Short-duration one-time code</strong>
-          </div>
-
-          <div className="auth-form__meta-card">
-            <span>Use case</span>
-            <strong>Fast access without password</strong>
+          <div>
+            <h3>Login without password</h3>
+            <p>Use OTP for quick account access.</p>
           </div>
         </div>
 
-        <section className="auth-form__section">
-          <div className="auth-form__section-header">
-            <div className="auth-form__section-copy">
-              <p className="auth-form__eyebrow">Step 1</p>
-              <h3 className="auth-form__title">Request OTP</h3>
-              <p className="auth-form__description">
-                Enter the mobile number linked to your account and request a
-                one-time passcode.
-              </p>
-            </div>
+        <InputField
+          label="Email or Mobile"
+          name="emailOrMobile"
+          placeholder="example@mail.com or 9876543210"
+          value={form.emailOrMobile}
+          onChange={handleChange}
+          autoComplete="username"
+        />
 
-            <div className="auth-form__icon">
-              <Smartphone size={18} />
-            </div>
-          </div>
-
-          <div className="auth-form__otp-row">
-            <InputField
-              label="Mobile Number"
-              name="mobileNumber"
-              placeholder="Enter registered mobile number"
-              value={form.mobileNumber}
-              onChange={handleChange}
-            />
-
-            <Button
-              type="button"
-              variant="secondary"
-              loading={otpLoading}
-              onClick={handleSendOtp}
-            >
-              {otpSent ? "Resend OTP" : "Send OTP"}
-            </Button>
-          </div>
-        </section>
-
-        <section className="auth-form__section">
-          <div className="auth-form__section-header">
-            <div className="auth-form__section-copy">
-              <p className="auth-form__eyebrow">Step 2</p>
-              <h3 className="auth-form__title">Verify and sign in</h3>
-              <p className="auth-form__description">
-                Enter the OTP exactly as received. Incorrect or expired codes
-                will not be accepted.
-              </p>
-            </div>
-
-            <div className="auth-form__icon">
-              <KeyRound size={18} />
-            </div>
-          </div>
-
+        <div className="auth-otp-row">
           <InputField
             label="OTP"
             name="otp"
             placeholder="Enter OTP"
             value={form.otp}
             onChange={handleChange}
+            autoComplete="one-time-code"
           />
 
-          <div className="auth-form__helper">
-            <Info size={16} />
-            <p>
-              OTP login still respects account status. If your account is
-              restricted, sign-in may succeed while voting actions remain
-              unavailable.
-            </p>
-          </div>
-        </section>
-
-        <div className="auth-form__actions">
-          <Button type="submit" loading={submitLoading}>
-            Verify and Sign In
+          <Button
+            type="button"
+            variant="secondary"
+            loading={otpLoading}
+            onClick={handleSendOtp}
+          >
+            {otpSent ? (
+              <>
+                <RefreshCw size={16} />
+                Resend
+              </>
+            ) : (
+              <>
+                <MailCheck size={16} />
+                Send OTP
+              </>
+            )}
           </Button>
+        </div>
 
-          <p className="auth-footer-text">
-            Prefer password login?{" "}
-            <Link to={APP_ROUTES.LOGIN}>Sign in with password</Link>
-          </p>
+        <Button
+          className="auth-login-submit"
+          type="submit"
+          loading={isAuthActionLoading}
+        >
+          Verify & Login
+          {!isAuthActionLoading ? <ArrowRight size={17} /> : null}
+        </Button>
 
-          <p className="auth-footer-text">
-            Need a new account?{" "}
-            <Link to={APP_ROUTES.REGISTER}>Create an account</Link>
-          </p>
+        <div className="auth-link-row">
+          <Link to={APP_ROUTES.LOGIN}>
+            <ArrowLeft size={15} />
+            Password login
+          </Link>
+
+          <Link to={APP_ROUTES.REGISTER}>Create account</Link>
+        </div>
+
+        <div className="auth-security-note">
+          <ShieldCheck size={16} />
+          <p>Dashboard opens based on your role.</p>
         </div>
       </form>
     </AuthLayout>

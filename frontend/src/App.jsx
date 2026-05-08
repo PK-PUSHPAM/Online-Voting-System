@@ -1,6 +1,8 @@
 import { BrowserRouter } from "react-router-dom";
 import AppProviders from "./app/AppProviders";
 import AppRouter from "./app/AppRouter";
+import AppErrorBoundary from "./components/common/AppErrorBoundary";
+import ScrollToTop from "./components/common/ScrollToTop";
 
 // Base CSS files
 import "./styles/dashboard.css";
@@ -13,6 +15,21 @@ import "./styles/results-analytics.css";
 import "./styles/system-control.css";
 import "./styles/voter-clean-pages.css";
 
+// Public homepage.
+import "./styles/public-home.css";
+
+// Public demo showcase.
+import "./styles/demo-showcase.css";
+
+// Public navbar + homepage animation polish.
+import "./styles/public-navbar-polish.css";
+
+// Public/auth final polish.
+import "./styles/public-auth-final-polish.css";
+
+// Animated shared error pages.
+import "./styles/error-pages.css";
+
 // Final safe override for voter bell + public chat UI.
 import "./styles/voter-center-polish.css";
 
@@ -23,15 +40,20 @@ import "./styles/admin-light-theme.css";
 import "./styles/admin-final-polish.css";
 
 // Final mobile/sidebar hardening.
-// Keep this LAST.
 import "./styles/admin-mobile-hardening.css";
+
+// Final global polish.
+import "./styles/app-final-polish.css";
 
 export default function App() {
   return (
     <BrowserRouter>
-      <AppProviders>
-        <AppRouter />
-      </AppProviders>
+      <AppErrorBoundary>
+        <AppProviders>
+          <ScrollToTop />
+          <AppRouter />
+        </AppProviders>
+      </AppErrorBoundary>
     </BrowserRouter>
   );
 }

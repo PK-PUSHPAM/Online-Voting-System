@@ -2,14 +2,18 @@ import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import {
-  ShieldCheck,
-  FileText,
-  Upload,
-  CheckCircle2,
-  Info,
+  ArrowLeft,
+  ArrowRight,
   CalendarClock,
-  UserPlus,
+  CheckCircle2,
+  FileText,
+  Fingerprint,
+  Info,
+  MailCheck,
+  ShieldCheck,
   Trash2,
+  Upload,
+  UserPlus,
 } from "lucide-react";
 import AuthLayout from "../../components/layout/AuthLayout";
 import InputField from "../../components/common/InputField";
@@ -34,6 +38,24 @@ const initialForm = {
   documentUrl: "",
   documentPublicId: "",
 };
+
+const steps = [
+  {
+    id: "account",
+    label: "Account",
+    icon: UserPlus,
+  },
+  {
+    id: "identity",
+    label: "Identity",
+    icon: FileText,
+  },
+  {
+    id: "verify",
+    label: "Verify",
+    icon: ShieldCheck,
+  },
+];
 
 const identityTypeOptions = [
   { value: "other", label: "Other" },
@@ -69,6 +91,7 @@ export default function RegisterPage() {
   const { register, isAuthActionLoading } = useAuth();
   const fileInputRef = useRef(null);
 
+  const [activeStep, setActiveStep] = useState("account");
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [otpLoading, setOtpLoading] = useState(false);
@@ -78,12 +101,14 @@ export default function RegisterPage() {
 
   const age = useMemo(() => getAgeFromDob(form.dob), [form.dob]);
 
+  const activeStepIndex = steps.findIndex((step) => step.id === activeStep);
+
   const isIdentityLast4Required = useMemo(
     () => form.identityType !== "other",
     [form.identityType],
   );
 
-  const ageEligibilityText = useMemo(() => {
+  const ageEligibility = useMemo(() => {
     if (!form.dob || age === null) {
       return {
         className: "register-age-status register-age-status--warn",
@@ -94,15 +119,31 @@ export default function RegisterPage() {
     if (age >= 18) {
       return {
         className: "register-age-status register-age-status--ok",
-        text: `Age eligibility check passed: ${age} years`,
+        text: `Age eligibility passed: ${age} years`,
       };
     }
 
     return {
-      className: "register-age-status register-age-status--warn",
-      text: `Age eligibility check failed: ${age} years`,
+      className: "register-age-status register-age-status--danger",
+      text: `Age eligibility failed: ${age} years`,
     };
   }, [age, form.dob]);
+
+  const completion = useMemo(() => {
+    let score = 0;
+
+    if (form.fullName.trim().length >= 3) score += 1;
+    if (/\S+@\S+\.\S+/.test(form.email.trim())) score += 1;
+    if (/^[6-9]\d{9}$/.test(form.mobileNumber.trim())) score += 1;
+    if (form.password.length >= 8) score += 1;
+    if (age !== null && age >= 18) score += 1;
+    if (form.identityType === "other" || /^\d{4}$/.test(form.identityLast4)) {
+      score += 1;
+    }
+    if (form.otp.trim().length >= 4) score += 1;
+
+    return Math.round((score / 7) * 100);
+  }, [age, form]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -118,7 +159,7 @@ export default function RegisterPage() {
     }));
   };
 
-  const validate = () => {
+  const validateAccountStep = () => {
     const nextErrors = {};
 
     if (form.fullName.trim().length < 3) {
@@ -139,12 +180,15 @@ export default function RegisterPage() {
       )
     ) {
       nextErrors.password =
-        "Use at least 8 characters with uppercase, lowercase, number, and special character.";
+        "Use uppercase, lowercase, number, and special character.";
     }
 
-    if (!/^\d{4,6}$/.test(form.otp.trim())) {
-      nextErrors.otp = "OTP must contain 4 to 6 digits.";
-    }
+    setErrors((prev) => ({ ...prev, ...nextErrors }));
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const validateIdentityStep = () => {
+    const nextErrors = {};
 
     if (!form.dob) {
       nextErrors.dob = "Date of birth is required.";
@@ -159,8 +203,44 @@ export default function RegisterPage() {
         "Identity last 4 must contain exactly 4 digits.";
     }
 
-    setErrors(nextErrors);
+    setErrors((prev) => ({ ...prev, ...nextErrors }));
     return Object.keys(nextErrors).length === 0;
+  };
+
+  const validateVerifyStep = () => {
+    const nextErrors = {};
+
+    if (!/^\d{4,6}$/.test(form.otp.trim())) {
+      nextErrors.otp = "OTP must contain 4 to 6 digits.";
+    }
+
+    setErrors((prev) => ({ ...prev, ...nextErrors }));
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const validateAll = () => {
+    const accountOk = validateAccountStep();
+    const identityOk = validateIdentityStep();
+    const verifyOk = validateVerifyStep();
+
+    if (!accountOk) setActiveStep("account");
+    else if (!identityOk) setActiveStep("identity");
+    else if (!verifyOk) setActiveStep("verify");
+
+    return accountOk && identityOk && verifyOk;
+  };
+
+  const goNext = () => {
+    if (activeStep === "account" && !validateAccountStep()) return;
+    if (activeStep === "identity" && !validateIdentityStep()) return;
+
+    const nextIndex = Math.min(activeStepIndex + 1, steps.length - 1);
+    setActiveStep(steps[nextIndex].id);
+  };
+
+  const goBack = () => {
+    const previousIndex = Math.max(activeStepIndex - 1, 0);
+    setActiveStep(steps[previousIndex].id);
   };
 
   const handleSendOtp = async () => {
@@ -171,10 +251,12 @@ export default function RegisterPage() {
 
     if (!/^[6-9]\d{9}$/.test(mobileNumber)) {
       nextErrors.mobileNumber = "Enter a valid mobile number first.";
+      setActiveStep("account");
     }
 
     if (!/\S+@\S+\.\S+/.test(email)) {
       nextErrors.email = "Enter a valid email address first.";
+      setActiveStep("account");
     }
 
     if (Object.keys(nextErrors).length) {
@@ -211,6 +293,7 @@ export default function RegisterPage() {
       documentPublicId: "",
     }));
     setUploadedDocumentName("");
+
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -219,9 +302,7 @@ export default function RegisterPage() {
   const handleDocumentChange = async (event) => {
     const file = event.target.files?.[0];
 
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     const allowedMimeTypes = [
       "application/pdf",
@@ -272,9 +353,7 @@ export default function RegisterPage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!validate()) {
-      return;
-    }
+    if (!validateAll()) return;
 
     try {
       const payload = {
@@ -295,14 +374,15 @@ export default function RegisterPage() {
 
       toast.success(
         data?.isAdult
-          ? "Registration completed successfully. Please wait for admin verification."
-          : "Registration submitted, but age eligibility requirements were not met.",
+          ? "Registration completed. Please wait for admin verification."
+          : "Registration submitted, but age eligibility was not met.",
       );
 
       setForm(initialForm);
       setErrors({});
       setOtpSent(false);
       setUploadedDocumentName("");
+      setActiveStep("account");
 
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -315,278 +395,364 @@ export default function RegisterPage() {
   return (
     <AuthLayout
       title="Create voter account"
-      subtitle="Register with verified personal details to request access to the voting platform."
-      badge="OTP Verified Registration"
+      subtitle="Register once, verify through OTP, then wait for admin approval."
+      badge="Voter Registration"
     >
-      <form onSubmit={handleSubmit} className="register-form">
-        <div className="register-meta-strip">
-          <div className="register-meta-pill">
-            <span>Verification</span>
-            <strong>Mobile OTP required</strong>
+      <form
+        onSubmit={handleSubmit}
+        className="register-form register-form--clean"
+      >
+        <div className="register-progress-card">
+          <div className="register-progress-card__top">
+            <div>
+              <strong>{completion}% complete</strong>
+              <span>Fill the required fields to submit registration.</span>
+            </div>
+
+            <div className="register-progress-ring">{completion}%</div>
           </div>
 
-          <div className="register-meta-pill">
-            <span>Approval workflow</span>
-            <strong>Admin review after registration</strong>
-          </div>
-
-          <div className="register-meta-pill">
-            <span>Document support</span>
-            <strong>Optional upload available</strong>
+          <div className="register-progress-bar">
+            <span style={{ width: `${completion}%` }} />
           </div>
         </div>
 
-        <section className="register-section">
-          <div className="register-section__header">
-            <div className="register-section__title-wrap">
-              <p className="register-section__eyebrow">Step 1</p>
-              <h3 className="register-section__title">Identity details</h3>
-              <p className="register-section__description">
-                Provide accurate personal information to avoid delays during
-                account verification.
-              </p>
-            </div>
+        <div className="register-step-tabs" role="tablist">
+          {steps.map((step, index) => {
+            const Icon = step.icon;
+            const isActive = activeStep === step.id;
+            const isCompleted = index < activeStepIndex;
 
-            <div className="register-section__icon">
-              <UserPlus size={18} />
-            </div>
-          </div>
-
-          <div className="register-grid">
-            <InputField
-              label="Full Name"
-              name="fullName"
-              placeholder="Enter full name"
-              value={form.fullName}
-              onChange={handleChange}
-              error={errors.fullName}
-            />
-
-            <InputField
-              label="Email"
-              name="email"
-              type="email"
-              placeholder="Enter email"
-              value={form.email}
-              onChange={handleChange}
-              error={errors.email}
-            />
-
-            <InputField
-              label="Mobile Number"
-              name="mobileNumber"
-              placeholder="10-digit mobile number"
-              value={form.mobileNumber}
-              onChange={handleChange}
-              error={errors.mobileNumber}
-            />
-
-            <InputField
-              label="Password"
-              name="password"
-              type="password"
-              placeholder="Create a strong password"
-              value={form.password}
-              onChange={handleChange}
-              error={errors.password}
-              hint="Use uppercase, lowercase, number, and special character."
-            />
-
-            <InputField
-              label="Date of Birth"
-              name="dob"
-              type="date"
-              value={form.dob}
-              onChange={handleChange}
-              error={errors.dob}
-            />
-
-            <div className="form-field">
-              <label className="form-label">Identity Type</label>
-              <select
-                className="register-select"
-                name="identityType"
-                value={form.identityType}
-                onChange={handleChange}
+            return (
+              <button
+                key={step.id}
+                type="button"
+                className={[
+                  "register-step-tab",
+                  isActive ? "register-step-tab--active" : "",
+                  isCompleted ? "register-step-tab--completed" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onClick={() => setActiveStep(step.id)}
               >
-                {identityTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                <span>
+                  {isCompleted ? (
+                    <CheckCircle2 size={16} />
+                  ) : (
+                    <Icon size={16} />
+                  )}
+                </span>
+                {step.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {activeStep === "account" && (
+          <section className="register-section register-section--clean">
+            <div className="register-section__header">
+              <div>
+                <p className="register-section__eyebrow">Step 1</p>
+                <h3 className="register-section__title">Account details</h3>
+                <p className="register-section__description">
+                  Use real information. Fake data will likely be rejected during
+                  admin verification.
+                </p>
+              </div>
+
+              <div className="register-section__icon">
+                <UserPlus size={18} />
+              </div>
             </div>
 
-            <InputField
-              className="register-grid__full"
-              label="Identity Last 4"
-              name="identityLast4"
-              placeholder="Enter last 4 digits"
-              value={form.identityLast4}
-              onChange={handleChange}
-              error={errors.identityLast4}
-              hint={
-                isIdentityLast4Required
-                  ? "Required for the selected identity type."
-                  : "Optional when identity type is set to Other."
-              }
-            />
-          </div>
+            <div className="register-grid">
+              <InputField
+                label="Full Name"
+                name="fullName"
+                placeholder="Enter full name"
+                value={form.fullName}
+                onChange={handleChange}
+                error={errors.fullName}
+              />
 
-          <div className={ageEligibilityText.className}>
-            <CalendarClock size={16} />
-            <span>{ageEligibilityText.text}</span>
-          </div>
-        </section>
+              <InputField
+                label="Email"
+                name="email"
+                type="email"
+                placeholder="Enter email"
+                value={form.email}
+                onChange={handleChange}
+                error={errors.email}
+              />
 
-        <section className="register-section">
-          <div className="register-section__header">
-            <div className="register-section__title-wrap">
-              <p className="register-section__eyebrow">Step 2</p>
-              <h3 className="register-section__title">Supporting document</h3>
-              <p className="register-section__description">
-                You may upload a document to support your verification request
-                and reduce manual follow-up.
+              <InputField
+                label="Mobile Number"
+                name="mobileNumber"
+                placeholder="10-digit mobile number"
+                value={form.mobileNumber}
+                onChange={handleChange}
+                error={errors.mobileNumber}
+              />
+
+              <InputField
+                label="Password"
+                name="password"
+                type="password"
+                placeholder="Create a strong password"
+                value={form.password}
+                onChange={handleChange}
+                error={errors.password}
+                hint="Use uppercase, lowercase, number, and special character."
+              />
+            </div>
+
+            <div className="register-inline-note">
+              <ShieldCheck size={16} />
+              <p>
+                This account will not be allowed to vote until admin approves
+                your voter profile.
               </p>
             </div>
+          </section>
+        )}
 
-            <div className="register-section__icon">
-              <FileText size={18} />
-            </div>
-          </div>
-
-          <div className="register-upload">
-            <div className="register-upload__box">
-              <div className="register-upload__content">
-                <div className="register-upload__icon">
-                  <Upload size={18} />
-                </div>
-
-                <div>
-                  <h4>Upload identity or supporting document</h4>
-                  <p>
-                    Accepted formats: PDF, PNG, JPG, JPEG, WEBP. Maximum size: 5
-                    MB.
-                  </p>
-                </div>
+        {activeStep === "identity" && (
+          <section className="register-section register-section--clean">
+            <div className="register-section__header">
+              <div>
+                <p className="register-section__eyebrow">Step 2</p>
+                <h3 className="register-section__title">Identity details</h3>
+                <p className="register-section__description">
+                  Date of birth is mandatory. Supporting document is optional
+                  but useful for approval.
+                </p>
               </div>
 
-              <div className="register-upload__actions">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="register-upload__hidden-input"
-                  accept=".pdf,.png,.jpg,.jpeg,.webp"
-                  onChange={handleDocumentChange}
-                />
+              <div className="register-section__icon">
+                <FileText size={18} />
+              </div>
+            </div>
 
-                <Button
-                  type="button"
-                  variant="secondary"
-                  loading={documentUploadLoading}
-                  onClick={handlePickDocument}
+            <div className="register-grid">
+              <InputField
+                label="Date of Birth"
+                name="dob"
+                type="date"
+                value={form.dob}
+                onChange={handleChange}
+                error={errors.dob}
+              />
+
+              <div className="form-field">
+                <label className="form-label">Identity Type</label>
+                <select
+                  className="register-select"
+                  name="identityType"
+                  value={form.identityType}
+                  onChange={handleChange}
                 >
-                  {form.documentUrl ? "Replace file" : "Choose file"}
-                </Button>
+                  {identityTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              <InputField
+                className="register-grid__full"
+                label="Identity Last 4"
+                name="identityLast4"
+                placeholder="Enter last 4 digits"
+                value={form.identityLast4}
+                onChange={handleChange}
+                error={errors.identityLast4}
+                hint={
+                  isIdentityLast4Required
+                    ? "Required for the selected identity type."
+                    : "Optional when identity type is Other."
+                }
+              />
             </div>
 
-            {form.documentUrl ? (
-              <div className="register-upload__summary">
-                <div className="register-upload__summary-left">
-                  <div className="register-upload__summary-icon">
-                    <CheckCircle2 size={18} />
+            <div className={ageEligibility.className}>
+              <CalendarClock size={16} />
+              <span>{ageEligibility.text}</span>
+            </div>
+
+            <div className="register-upload register-upload--clean">
+              <div className="register-upload__box">
+                <div className="register-upload__content">
+                  <div className="register-upload__icon">
+                    <Upload size={18} />
                   </div>
 
                   <div>
-                    <h5>Document uploaded</h5>
-                    <p>{uploadedDocumentName || "Uploaded file attached"}</p>
+                    <h4>Supporting document</h4>
+                    <p>PDF, PNG, JPG, JPEG, WEBP. Maximum size: 5 MB.</p>
                   </div>
                 </div>
 
                 <div className="register-upload__actions">
-                  <a
-                    href={form.documentUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="register-upload__summary-link"
-                  >
-                    Open file
-                  </a>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="register-upload__hidden-input"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp"
+                    onChange={handleDocumentChange}
+                  />
 
                   <Button
                     type="button"
                     variant="secondary"
-                    onClick={handleRemoveUploadedDocument}
+                    loading={documentUploadLoading}
+                    onClick={handlePickDocument}
                   >
-                    <Trash2 size={16} />
-                    Remove
+                    {form.documentUrl ? "Replace file" : "Choose file"}
                   </Button>
                 </div>
               </div>
-            ) : null}
-          </div>
 
-          <div className="register-helper">
-            <Info size={16} />
-            <p>
-              Document upload is optional, but it can help accelerate the manual
-              verification process.
-            </p>
-          </div>
-        </section>
+              {form.documentUrl ? (
+                <div className="register-upload__summary">
+                  <div className="register-upload__summary-left">
+                    <div className="register-upload__summary-icon">
+                      <CheckCircle2 size={18} />
+                    </div>
 
-        <section className="register-section">
-          <div className="register-section__header">
-            <div className="register-section__title-wrap">
-              <p className="register-section__eyebrow">Step 3</p>
-              <h3 className="register-section__title">OTP verification</h3>
-              <p className="register-section__description">
-                Request the OTP first, then enter the code exactly as received
-                to complete registration.
+                    <div>
+                      <h5>Document uploaded</h5>
+                      <p>{uploadedDocumentName || "Uploaded file attached"}</p>
+                    </div>
+                  </div>
+
+                  <div className="register-upload__actions">
+                    <a
+                      href={form.documentUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="register-upload__summary-link"
+                    >
+                      Open file
+                    </a>
+
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={handleRemoveUploadedDocument}
+                    >
+                      <Trash2 size={16} />
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="register-inline-note">
+              <Info size={16} />
+              <p>
+                Document upload is optional, but skipping it can slow manual
+                verification.
               </p>
             </div>
+          </section>
+        )}
 
-            <div className="register-section__icon">
-              <ShieldCheck size={18} />
+        {activeStep === "verify" && (
+          <section className="register-section register-section--clean">
+            <div className="register-section__header">
+              <div>
+                <p className="register-section__eyebrow">Step 3</p>
+                <h3 className="register-section__title">OTP verification</h3>
+                <p className="register-section__description">
+                  Send OTP to your registered email, enter the code, then submit
+                  registration.
+                </p>
+              </div>
+
+              <div className="register-section__icon">
+                <Fingerprint size={18} />
+              </div>
             </div>
-          </div>
 
-          <div className="register-otp-row">
+            <div className="register-verify-card">
+              <div className="register-verify-card__icon">
+                <MailCheck size={22} />
+              </div>
+
+              <div>
+                <h4>{otpSent ? "OTP sent" : "Send OTP first"}</h4>
+                <p>
+                  OTP will be sent to{" "}
+                  <strong>{form.email || "your email address"}</strong>.
+                </p>
+              </div>
+
+              <Button
+                type="button"
+                variant="secondary"
+                loading={otpLoading}
+                onClick={handleSendOtp}
+              >
+                {otpSent ? "Resend OTP" : "Send OTP"}
+              </Button>
+            </div>
+
             <InputField
               label="OTP"
               name="otp"
-              placeholder="Enter OTP"
+              placeholder="Enter 4-6 digit OTP"
               value={form.otp}
               onChange={handleChange}
               error={errors.otp}
             />
 
-            <Button
+            <div className="register-inline-note register-inline-note--green">
+              <ShieldCheck size={16} />
+              <p>
+                After successful registration, admin approval is still required
+                before voting access.
+              </p>
+            </div>
+          </section>
+        )}
+
+        <div className="register-nav-actions">
+          <button
+            type="button"
+            className="register-nav-btn register-nav-btn--secondary"
+            onClick={goBack}
+            disabled={activeStepIndex === 0 || isAuthActionLoading}
+          >
+            <ArrowLeft size={16} />
+            Back
+          </button>
+
+          {activeStep !== "verify" ? (
+            <button
               type="button"
-              variant="secondary"
-              loading={otpLoading}
-              onClick={handleSendOtp}
+              className="register-nav-btn register-nav-btn--primary"
+              onClick={goNext}
             >
-              {otpSent ? "Resend OTP" : "Send OTP"}
+              Continue
+              <ArrowRight size={16} />
+            </button>
+          ) : (
+            <Button
+              type="submit"
+              className="register-submit-btn"
+              loading={isAuthActionLoading}
+            >
+              Complete Registration
             </Button>
-          </div>
-        </section>
-
-        <div className="register-submit-wrap">
-          <Button type="submit" loading={isAuthActionLoading}>
-            Complete Registration
-          </Button>
-
-          <p className="register-footer-note">
-            After registration, your account may remain restricted until the
-            admin verification process is completed.
-          </p>
-
-          <p className="auth-footer-text">
-            Already have an account? <Link to={APP_ROUTES.LOGIN}>Sign in</Link>
-          </p>
+          )}
         </div>
+
+        <p className="auth-footer-text register-footer-text">
+          Already have an account? <Link to={APP_ROUTES.LOGIN}>Sign in</Link>
+        </p>
       </form>
     </AuthLayout>
   );

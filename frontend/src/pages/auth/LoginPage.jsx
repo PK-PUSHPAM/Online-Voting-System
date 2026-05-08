@@ -1,7 +1,16 @@
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { useState } from "react";
-import { LockKeyhole, ShieldCheck, UserCircle2, Info } from "lucide-react";
+import {
+  ArrowRight,
+  Eye,
+  Fingerprint,
+  KeyRound,
+  LockKeyhole,
+  Mail,
+  ShieldCheck,
+  UserPlus,
+} from "lucide-react";
 import AuthLayout from "../../components/layout/AuthLayout";
 import InputField from "../../components/common/InputField";
 import Button from "../../components/common/Button";
@@ -34,12 +43,12 @@ export default function LoginPage() {
     event.preventDefault();
 
     if (!form.emailOrMobile.trim()) {
-      toast.error("Please enter your email address or mobile number.");
+      toast.error("Enter your email address or mobile number.");
       return;
     }
 
     if (!form.password) {
-      toast.error("Please enter your password.");
+      toast.error("Enter your password.");
       return;
     }
 
@@ -66,115 +75,104 @@ export default function LoginPage() {
 
   return (
     <AuthLayout
-      title="Sign in to your account"
-      subtitle="Access the voting platform securely using your registered credentials."
-      badge="Secure Account Access"
+      title="Welcome back"
+      subtitle="Login with registered email/mobile and password."
+      badge="Secure Login"
     >
-      <form className="auth-form" onSubmit={handleSubmit}>
-        <div className="auth-form__meta-strip">
-          <div className="auth-form__meta-card">
-            <span>Login method</span>
-            <strong>Email or mobile with password</strong>
+      <form className="auth-form auth-form--compact" onSubmit={handleSubmit}>
+        <div className="auth-login-intro">
+          <div className="auth-login-intro__icon">
+            <LockKeyhole size={20} />
           </div>
 
-          <div className="auth-form__meta-card">
-            <span>Access type</span>
-            <strong>Voter, Admin, and Super Admin accounts</strong>
-          </div>
-
-          <div className="auth-form__meta-card">
-            <span>Security</span>
-            <strong>Session-based protected access</strong>
+          <div>
+            <h3>Account sign in</h3>
+            <p>Same login for voter, admin, and super admin.</p>
           </div>
         </div>
 
-        <section className="auth-form__section">
-          <div className="auth-form__section-header">
-            <div className="auth-form__section-copy">
-              <p className="auth-form__eyebrow">Step 1</p>
-              <h3 className="auth-form__title">Account credentials</h3>
-              <p className="auth-form__description">
-                Enter the same email address or mobile number used during
-                registration, along with your password.
-              </p>
-            </div>
-
-            <div className="auth-form__icon">
-              <UserCircle2 size={18} />
-            </div>
+        <div className="auth-demo-card">
+          <div>
+            <strong>Demo preview</strong>
+            <span>Fake read-only dashboards</span>
           </div>
 
-          <div className="auth-form__grid">
-            <InputField
-              className="auth-form__full"
-              label="Email or Mobile Number"
-              name="emailOrMobile"
-              placeholder="Enter email or mobile number"
-              value={form.emailOrMobile}
-              onChange={handleChange}
-            />
+          <Link to="/demo">
+            <Eye size={16} />
+            Open Demo
+          </Link>
+        </div>
 
-            <InputField
-              className="auth-form__full"
-              label="Password"
-              name="password"
-              type="password"
-              placeholder="Enter password"
-              value={form.password}
-              onChange={handleChange}
-            />
+        <div className="auth-login-fields">
+          <InputField
+            className="auth-form__full"
+            label="Email or Mobile Number"
+            name="emailOrMobile"
+            placeholder="example@mail.com or 9876543210"
+            value={form.emailOrMobile}
+            onChange={handleChange}
+            autoComplete="username"
+          />
+
+          <InputField
+            className="auth-form__full"
+            label="Password"
+            name="password"
+            type="password"
+            placeholder="Enter your password"
+            value={form.password}
+            onChange={handleChange}
+            autoComplete="current-password"
+          />
+        </div>
+
+        <div className="auth-login-options">
+          <Link to={APP_ROUTES.OTP_LOGIN}>
+            <Fingerprint size={15} />
+            Login with OTP
+          </Link>
+
+          <Link to={APP_ROUTES.FORGOT_PASSWORD}>
+            <KeyRound size={15} />
+            Forgot password?
+          </Link>
+        </div>
+
+        <Button
+          className="auth-login-submit"
+          type="submit"
+          loading={isAuthActionLoading}
+        >
+          Sign In
+          {!isAuthActionLoading ? <ArrowRight size={17} /> : null}
+        </Button>
+
+        <div className="auth-login-divider">
+          <span />
+          <p>New voter?</p>
+          <span />
+        </div>
+
+        <Link className="auth-register-cta" to={APP_ROUTES.REGISTER}>
+          <UserPlus size={17} />
+          Create voter account
+        </Link>
+
+        <div className="auth-security-note">
+          <ShieldCheck size={16} />
+          <p>Role-based dashboard opens after login.</p>
+        </div>
+
+        <div className="auth-demo-strip">
+          <div>
+            <Mail size={15} />
+            <span>Email/mobile login</span>
           </div>
-        </section>
 
-        <section className="auth-form__section">
-          <div className="auth-form__section-header">
-            <div className="auth-form__section-copy">
-              <p className="auth-form__eyebrow">Step 2</p>
-              <h3 className="auth-form__title">Session access</h3>
-              <p className="auth-form__description">
-                After successful sign-in, you will be redirected according to
-                your role and account permissions.
-              </p>
-            </div>
-
-            <div className="auth-form__icon">
-              <LockKeyhole size={18} />
-            </div>
+          <div>
+            <ShieldCheck size={15} />
+            <span>Role redirect</span>
           </div>
-
-          <div className="auth-form__helper">
-            <Info size={16} />
-            <p>
-              If your voter account has not been approved yet, you may still
-              sign in, but voting-related actions can remain restricted until
-              verification is complete.
-            </p>
-          </div>
-        </section>
-
-        <div className="auth-form__actions">
-          <Button type="submit" loading={isAuthActionLoading}>
-            Sign In
-          </Button>
-
-          <p className="auth-form__footer-note">
-            For passwordless access, you can use the OTP sign-in option if it is
-            enabled for your account.
-          </p>
-
-          <p className="auth-footer-text">
-            Need another option?{" "}
-            <Link to={APP_ROUTES.OTP_LOGIN}>Login with OTP</Link>
-          </p>
-
-          <p className="auth-footer-text">
-            Forgot your password?{" "}
-            <Link to={APP_ROUTES.FORGOT_PASSWORD}>Reset password</Link>
-          </p>
-
-          <p className="auth-footer-text">
-            New here? <Link to={APP_ROUTES.REGISTER}>Create an account</Link>
-          </p>
         </div>
       </form>
     </AuthLayout>

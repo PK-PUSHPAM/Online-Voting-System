@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck,
   CheckCircle2,
+  Edit3,
   Filter,
   Image as ImageIcon,
   LayoutGrid,
@@ -10,8 +11,10 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  Trash2,
   UserSquare2,
   Vote,
+  X,
   XCircle,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -38,42 +41,26 @@ const initialForm = {
   isActive: true,
 };
 
+const initialEditForm = {
+  fullName: "",
+  partyName: "",
+  manifesto: "",
+  candidatePhotoUrl: "",
+  candidatePhotoPublicId: "",
+  displayOrder: 0,
+  isActive: true,
+};
+
 const tabs = [
   { id: "overview", label: "Overview", icon: LayoutGrid },
   { id: "create", label: "Create", icon: PlusCircle },
   { id: "manage", label: "Manage", icon: ListChecks },
 ];
 
-function formatDateTime(value) {
-  if (!value) return "-";
-
-  try {
-    return new Intl.DateTimeFormat("en-IN", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(new Date(value));
-  } catch {
-    return "-";
-  }
-}
-
 function formatStatus(value = "pending") {
   return String(value || "pending")
     .replaceAll("_", " ")
     .replace(/^./, (letter) => letter.toUpperCase());
-}
-
-function getElectionTitle(elections, electionId) {
-  const matchedElection = elections.find(
-    (election) => String(election._id) === String(electionId),
-  );
-
-  return matchedElection?.title || "Election";
-}
-
-function getPostTitle(posts, postId) {
-  const matchedPost = posts.find((post) => String(post._id) === String(postId));
-  return matchedPost?.title || "Post";
 }
 
 function ApprovalPill({ status = "pending" }) {
@@ -120,13 +107,18 @@ function CandidateCard({
   candidate,
   selectedPost,
   selectedElection,
+  onEdit,
   onApprove,
   onReject,
-  approvingId,
+  onToggleActive,
+  onDelete,
+  actionId,
 }) {
   const status = String(candidate?.approvalStatus || "pending").toLowerCase();
   const canApprove = status !== "approved";
   const canReject = status !== "rejected";
+  const isActive = candidate?.isActive !== false;
+  const isBusy = actionId === candidate?._id;
 
   return (
     <article className="acp-candidate-card">
@@ -178,7 +170,7 @@ function CandidateCard({
       ) : null}
 
       <div className="acp-candidate-card__chips">
-        <ActivePill active={candidate?.isActive !== false} />
+        <ActivePill active={isActive} />
 
         <span className="acp-id-chip">
           <CheckCircle2 size={13} />
@@ -212,22 +204,52 @@ function CandidateCard({
       <div className="acp-candidate-card__actions">
         <button
           type="button"
-          className="adm-primary-btn"
-          onClick={() => onApprove(candidate)}
-          disabled={!canApprove || approvingId === candidate._id}
+          className="acp-action-btn acp-action-btn--edit"
+          onClick={() => onEdit(candidate)}
+          disabled={isBusy}
         >
-          <BadgeCheck size={15} />
-          {approvingId === candidate._id ? "Updating..." : "Approve"}
+          <Edit3 size={15} />
+          Edit
         </button>
 
         <button
           type="button"
-          className="acp-danger-btn"
+          className="acp-action-btn acp-action-btn--approve"
+          onClick={() => onApprove(candidate)}
+          disabled={!canApprove || isBusy}
+        >
+          <BadgeCheck size={15} />
+          {isBusy ? "Updating..." : "Approve"}
+        </button>
+
+        <button
+          type="button"
+          className="acp-action-btn acp-action-btn--warning"
+          onClick={() => onToggleActive(candidate)}
+          disabled={isBusy}
+        >
+          <ShieldCheck size={15} />
+          {isActive ? "Deactivate" : "Activate"}
+        </button>
+
+        <button
+          type="button"
+          className="acp-action-btn acp-action-btn--reject"
           onClick={() => onReject(candidate)}
-          disabled={!canReject || approvingId === candidate._id}
+          disabled={!canReject || isBusy}
         >
           <XCircle size={15} />
           Reject
+        </button>
+
+        <button
+          type="button"
+          className="acp-action-btn acp-action-btn--danger"
+          onClick={() => onDelete(candidate)}
+          disabled={isBusy}
+        >
+          <Trash2 size={15} />
+          Delete
         </button>
       </div>
     </article>
@@ -251,11 +273,16 @@ export default function CandidatesManagementPage() {
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
+  const [updateLoading, setUpdateLoading] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
-  const [approvingId, setApprovingId] = useState("");
+  const [editPhotoUploading, setEditPhotoUploading] = useState(false);
+  const [actionId, setActionId] = useState("");
 
   const [page, setPage] = useState(1);
   const [form, setForm] = useState(initialForm);
+
+  const [editingCandidate, setEditingCandidate] = useState(null);
+  const [editForm, setEditForm] = useState(initialEditForm);
 
   const selectedElection = useMemo(
     () => elections.find((item) => item._id === selectedElectionId) || null,
@@ -410,6 +437,15 @@ export default function CandidatesManagementPage() {
     }));
   };
 
+  const handleEditFormChange = (event) => {
+    const { name, value, type, checked } = event.target;
+
+    setEditForm((current) => ({
+      ...current,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
   const handlePhotoChange = async (event) => {
     const file = event.target.files?.[0];
 
@@ -438,7 +474,35 @@ export default function CandidatesManagementPage() {
     }
   };
 
-  const validateForm = () => {
+  const handleEditPhotoChange = async (event) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    try {
+      setEditPhotoUploading(true);
+
+      const uploaded = await uploadService.uploadCandidatePhoto(
+        file,
+        editForm.candidatePhotoPublicId,
+      );
+
+      setEditForm((current) => ({
+        ...current,
+        candidatePhotoUrl: uploaded?.fileUrl || "",
+        candidatePhotoPublicId: uploaded?.publicId || "",
+      }));
+
+      toast.success("Candidate photo updated.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setEditPhotoUploading(false);
+      event.target.value = "";
+    }
+  };
+
+  const validateCreateForm = () => {
     if (!selectedElectionId || !selectedPostId) {
       toast.error("Please select both election and post.");
       return false;
@@ -452,10 +516,19 @@ export default function CandidatesManagementPage() {
     return true;
   };
 
+  const validateEditForm = () => {
+    if (!editForm.fullName.trim()) {
+      toast.error("Candidate full name is required.");
+      return false;
+    }
+
+    return true;
+  };
+
   const handleCreate = async (event) => {
     event.preventDefault();
 
-    if (!validateForm()) return;
+    if (!validateCreateForm()) return;
 
     try {
       setCreateLoading(true);
@@ -484,11 +557,59 @@ export default function CandidatesManagementPage() {
     }
   };
 
+  const openEditModal = (candidate) => {
+    setEditingCandidate(candidate);
+
+    setEditForm({
+      fullName: candidate?.fullName || "",
+      partyName: candidate?.partyName || "",
+      manifesto: candidate?.manifesto || "",
+      candidatePhotoUrl: candidate?.candidatePhotoUrl || "",
+      candidatePhotoPublicId: candidate?.candidatePhotoPublicId || "",
+      displayOrder: Number(candidate?.displayOrder || 0),
+      isActive: candidate?.isActive !== false,
+    });
+  };
+
+  const closeEditModal = () => {
+    setEditingCandidate(null);
+    setEditForm(initialEditForm);
+  };
+
+  const handleUpdateCandidate = async (event) => {
+    event.preventDefault();
+
+    if (!editingCandidate?._id) return;
+    if (!validateEditForm()) return;
+
+    try {
+      setUpdateLoading(true);
+
+      await candidateService.update(editingCandidate._id, {
+        fullName: editForm.fullName.trim(),
+        partyName: editForm.partyName.trim(),
+        manifesto: editForm.manifesto.trim(),
+        candidatePhotoUrl: editForm.candidatePhotoUrl,
+        candidatePhotoPublicId: editForm.candidatePhotoPublicId,
+        displayOrder: Number(editForm.displayOrder || 0),
+        isActive: Boolean(editForm.isActive),
+      });
+
+      toast.success("Candidate updated successfully.");
+      closeEditModal();
+      await loadCandidates(selectedPostId, page);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
   const handleApproveCandidate = async (candidate) => {
     if (!candidate?._id) return;
 
     try {
-      setApprovingId(candidate._id);
+      setActionId(candidate._id);
 
       await candidateService.approve(candidate._id, {
         action: "approve",
@@ -499,7 +620,7 @@ export default function CandidatesManagementPage() {
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     } finally {
-      setApprovingId("");
+      setActionId("");
     }
   };
 
@@ -514,7 +635,7 @@ export default function CandidatesManagementPage() {
     if (reason === null) return;
 
     try {
-      setApprovingId(candidate._id);
+      setActionId(candidate._id);
 
       await candidateService.approve(candidate._id, {
         action: "reject",
@@ -526,7 +647,62 @@ export default function CandidatesManagementPage() {
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     } finally {
-      setApprovingId("");
+      setActionId("");
+    }
+  };
+
+  const handleToggleActive = async (candidate) => {
+    if (!candidate?._id) return;
+
+    const nextStatus = candidate?.isActive === false;
+
+    const shouldContinue = window.confirm(
+      nextStatus
+        ? `Activate "${candidate.fullName}"?`
+        : `Deactivate "${candidate.fullName}"?`,
+    );
+
+    if (!shouldContinue) return;
+
+    try {
+      setActionId(candidate._id);
+
+      await candidateService.update(candidate._id, {
+        isActive: nextStatus,
+      });
+
+      toast.success(
+        nextStatus ? "Candidate activated." : "Candidate deactivated.",
+      );
+
+      await loadCandidates(selectedPostId, page);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setActionId("");
+    }
+  };
+
+  const handleDeleteCandidate = async (candidate) => {
+    if (!candidate?._id) return;
+
+    const shouldDelete = window.confirm(
+      `Delete "${candidate.fullName}"? This action cannot be undone.`,
+    );
+
+    if (!shouldDelete) return;
+
+    try {
+      setActionId(candidate._id);
+
+      await candidateService.remove(candidate._id);
+
+      toast.success("Candidate deleted successfully.");
+      await loadCandidates(selectedPostId, 1);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setActionId("");
     }
   };
 
@@ -890,7 +1066,7 @@ export default function CandidatesManagementPage() {
                 <Search size={16} />
                 <input
                   type="text"
-                  placeholder="Search is handled by selected post list"
+                  placeholder="Search is controlled by selected post list"
                   disabled
                 />
               </label>
@@ -937,9 +1113,12 @@ export default function CandidatesManagementPage() {
                     candidate={candidate}
                     selectedPost={selectedPost}
                     selectedElection={selectedElection}
+                    onEdit={openEditModal}
                     onApprove={handleApproveCandidate}
                     onReject={handleRejectCandidate}
-                    approvingId={approvingId}
+                    onToggleActive={handleToggleActive}
+                    onDelete={handleDeleteCandidate}
+                    actionId={actionId}
                   />
                 ))}
               </div>
@@ -984,6 +1163,141 @@ export default function CandidatesManagementPage() {
           </section>
         </div>
       )}
+
+      {editingCandidate ? (
+        <div className="acp-modal-backdrop" role="presentation">
+          <section className="acp-modal" role="dialog" aria-modal="true">
+            <div className="acp-modal__header">
+              <div>
+                <h3>Edit Candidate</h3>
+                <p>
+                  Update candidate profile, manifesto, order, status, and photo.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="acp-modal__close"
+                onClick={closeEditModal}
+                disabled={updateLoading}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form className="acp-form" onSubmit={handleUpdateCandidate}>
+              <div className="acp-form-grid">
+                <InputField
+                  label="Candidate Full Name"
+                  name="fullName"
+                  value={editForm.fullName}
+                  onChange={handleEditFormChange}
+                />
+
+                <InputField
+                  label="Party / Group Name"
+                  name="partyName"
+                  value={editForm.partyName}
+                  onChange={handleEditFormChange}
+                />
+
+                <InputField
+                  label="Display Order"
+                  name="displayOrder"
+                  type="number"
+                  min="0"
+                  value={editForm.displayOrder}
+                  onChange={handleEditFormChange}
+                />
+
+                <label className="acp-switch-card">
+                  <div>
+                    <strong>Candidate active</strong>
+                    <span>Inactive candidates stay hidden from voting.</span>
+                  </div>
+
+                  <input
+                    type="checkbox"
+                    name="isActive"
+                    checked={editForm.isActive}
+                    onChange={handleEditFormChange}
+                  />
+                </label>
+
+                <label className="acp-upload-card acp-form-grid__full">
+                  <div>
+                    <strong>Candidate photo</strong>
+                    <span>
+                      {editForm.candidatePhotoUrl
+                        ? "Photo available. Upload again to replace."
+                        : "PNG, JPG, JPEG, or WEBP"}
+                    </span>
+                  </div>
+
+                  <span className="adm-secondary-btn">
+                    {editPhotoUploading ? "Uploading..." : "Replace Photo"}
+                  </span>
+
+                  <input
+                    type="file"
+                    accept=".png,.jpg,.jpeg,.webp"
+                    onChange={handleEditPhotoChange}
+                    hidden
+                  />
+                </label>
+
+                {editForm.candidatePhotoUrl ? (
+                  <div className="acp-photo-preview acp-form-grid__full">
+                    <img
+                      src={editForm.candidatePhotoUrl}
+                      alt={editForm.fullName || "Candidate"}
+                    />
+                    <div>
+                      <strong>Current photo</strong>
+                      <a
+                        href={editForm.candidatePhotoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open image
+                      </a>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="form-field acp-form-grid__full">
+                  <label className="form-label">Manifesto</label>
+                  <textarea
+                    className="admin-crud__textarea"
+                    name="manifesto"
+                    value={editForm.manifesto}
+                    onChange={handleEditFormChange}
+                  />
+                </div>
+              </div>
+
+              <div className="acp-form-actions">
+                <Button
+                  className="admin-crud__submit"
+                  type="submit"
+                  loading={updateLoading}
+                >
+                  Save Changes
+                </Button>
+
+                <button
+                  type="button"
+                  className="adm-secondary-btn"
+                  onClick={closeEditModal}
+                  disabled={updateLoading}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }

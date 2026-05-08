@@ -3,6 +3,7 @@ import {
   CalendarRange,
   CheckCircle2,
   Clock3,
+  Edit3,
   Filter,
   Globe2,
   LayoutGrid,
@@ -12,8 +13,10 @@ import {
   Search,
   ShieldCheck,
   TimerReset,
+  Trash2,
   Trophy,
   Vote,
+  X,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import Button from "../../components/common/Button";
@@ -53,6 +56,19 @@ function formatDateTime(value) {
   }
 }
 
+function toDateTimeLocalValue(value) {
+  if (!value) return "";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  const offset = date.getTimezoneOffset();
+  const localDate = new Date(date.getTime() - offset * 60 * 1000);
+
+  return localDate.toISOString().slice(0, 16);
+}
+
 function formatStatus(value = "upcoming") {
   return String(value || "upcoming")
     .replaceAll("_", " ")
@@ -77,7 +93,33 @@ function getAccessLabel(value) {
   return value === "all" ? "All voters" : "Verified only";
 }
 
-function ElectionCard({ election }) {
+function MetricCard({ icon: Icon, label, value, helper, tone = "green" }) {
+  return (
+    <article className={`aep-metric-card aep-metric-card--${tone}`}>
+      <div className="aep-metric-card__icon">
+        <Icon size={20} />
+      </div>
+
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        {helper ? <p>{helper}</p> : null}
+      </div>
+    </article>
+  );
+}
+
+function ElectionCard({
+  election,
+  onEdit,
+  onTogglePublish,
+  onDelete,
+  actionId,
+}) {
+  const isBusy = actionId === election?._id;
+  const isUpcoming = election?.status === "upcoming";
+  const canDelete = isUpcoming;
+
   return (
     <article className="aep-election-card">
       <div className="aep-election-card__top">
@@ -122,22 +164,51 @@ function ElectionCard({ election }) {
             ID: {String(election?._id || "").slice(-6)}
           </span>
         </div>
-      </div>
-    </article>
-  );
-}
 
-function MetricCard({ icon: Icon, label, value, helper, tone = "green" }) {
-  return (
-    <article className={`aep-metric-card aep-metric-card--${tone}`}>
-      <div className="aep-metric-card__icon">
-        <Icon size={20} />
-      </div>
+        <div className="aep-card-actions">
+          <button
+            type="button"
+            className="aep-action-btn aep-action-btn--edit"
+            onClick={() => onEdit(election)}
+            disabled={isBusy}
+          >
+            <Edit3 size={15} />
+            Edit
+          </button>
 
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-        {helper ? <p>{helper}</p> : null}
+          <button
+            type="button"
+            className={
+              election?.isPublished
+                ? "aep-action-btn aep-action-btn--warning"
+                : "aep-action-btn aep-action-btn--publish"
+            }
+            onClick={() => onTogglePublish(election)}
+            disabled={isBusy}
+          >
+            <Globe2 size={15} />
+            {isBusy
+              ? "Updating..."
+              : election?.isPublished
+                ? "Unpublish"
+                : "Publish"}
+          </button>
+
+          <button
+            type="button"
+            className="aep-action-btn aep-action-btn--danger"
+            onClick={() => onDelete(election)}
+            disabled={!canDelete || isBusy}
+            title={
+              canDelete
+                ? "Delete election"
+                : "Only upcoming elections can be deleted"
+            }
+          >
+            <Trash2 size={15} />
+            Delete
+          </button>
+        </div>
       </div>
     </article>
   );
@@ -152,10 +223,15 @@ export default function ElectionsPage() {
 
   const [loading, setLoading] = useState(true);
   const [createLoading, setCreateLoading] = useState(false);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [actionId, setActionId] = useState("");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
+
+  const [editingElection, setEditingElection] = useState(null);
+  const [editForm, setEditForm] = useState(initialForm);
 
   const totalCount = Number(pagination?.totalItems || elections.length || 0);
 
@@ -219,19 +295,28 @@ export default function ElectionsPage() {
     }));
   };
 
-  const validateForm = () => {
-    if (!form.title.trim()) {
+  const handleEditChange = (event) => {
+    const { name, value, type, checked } = event.target;
+
+    setEditForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const validateElectionForm = (targetForm, mode = "create") => {
+    if (!targetForm.title.trim()) {
       toast.error("Election title is required.");
       return false;
     }
 
-    if (!form.startDate || !form.endDate) {
+    if (!targetForm.startDate || !targetForm.endDate) {
       toast.error("Start and end date are required.");
       return false;
     }
 
-    const start = new Date(form.startDate);
-    const end = new Date(form.endDate);
+    const start = new Date(targetForm.startDate);
+    const end = new Date(targetForm.endDate);
 
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
       toast.error("Please enter valid dates.");
@@ -243,13 +328,18 @@ export default function ElectionsPage() {
       return false;
     }
 
+    if (mode === "create" && start <= new Date()) {
+      toast.error("Start date must be in the future.");
+      return false;
+    }
+
     return true;
   };
 
   const handleCreate = async (event) => {
     event.preventDefault();
 
-    if (!validateForm()) return;
+    if (!validateElectionForm(form, "create")) return;
 
     try {
       setCreateLoading(true);
@@ -274,6 +364,121 @@ export default function ElectionsPage() {
     }
   };
 
+  const openEditModal = (election) => {
+    setEditingElection(election);
+
+    setEditForm({
+      title: election?.title || "",
+      description: election?.description || "",
+      startDate: toDateTimeLocalValue(election?.startDate),
+      endDate: toDateTimeLocalValue(election?.endDate),
+      isPublished: Boolean(election?.isPublished),
+      allowedVoterType: election?.allowedVoterType || "verifiedOnly",
+    });
+  };
+
+  const closeEditModal = () => {
+    setEditingElection(null);
+    setEditForm(initialForm);
+  };
+
+  const handleUpdateElection = async (event) => {
+    event.preventDefault();
+
+    if (!editingElection?._id) return;
+
+    const isUpcoming = editingElection?.status === "upcoming";
+
+    if (isUpcoming && !validateElectionForm(editForm, "edit")) return;
+
+    try {
+      setUpdateLoading(true);
+
+      const payload = isUpcoming
+        ? {
+            title: editForm.title.trim(),
+            description: editForm.description.trim(),
+            startDate: editForm.startDate,
+            endDate: editForm.endDate,
+            isPublished: editForm.isPublished,
+            allowedVoterType: editForm.allowedVoterType,
+          }
+        : {
+            description: editForm.description.trim(),
+            isPublished: editForm.isPublished,
+          };
+
+      await electionService.update(editingElection._id, payload);
+
+      toast.success("Election updated successfully.");
+      closeEditModal();
+      await loadElections(page);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  const handleTogglePublish = async (election) => {
+    if (!election?._id) return;
+
+    const nextValue = !election.isPublished;
+
+    const shouldContinue = window.confirm(
+      nextValue
+        ? `Publish "${election.title}" for voters?`
+        : `Unpublish "${election.title}" from voters?`,
+    );
+
+    if (!shouldContinue) return;
+
+    try {
+      setActionId(election._id);
+
+      await electionService.update(election._id, {
+        isPublished: nextValue,
+      });
+
+      toast.success(
+        nextValue ? "Election published." : "Election unpublished.",
+      );
+      await loadElections(page);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setActionId("");
+    }
+  };
+
+  const handleDeleteElection = async (election) => {
+    if (!election?._id) return;
+
+    if (election.status !== "upcoming") {
+      toast.error("Only upcoming elections can be deleted.");
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      `Delete "${election.title}"? This action cannot be undone.`,
+    );
+
+    if (!shouldDelete) return;
+
+    try {
+      setActionId(election._id);
+
+      await electionService.remove(election._id);
+
+      toast.success("Election deleted successfully.");
+      await loadElections(1);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setActionId("");
+    }
+  };
+
   const handleFilterSubmit = async (event) => {
     event.preventDefault();
     await loadElections(1);
@@ -288,6 +493,8 @@ export default function ElectionsPage() {
   const hasNextPage = Boolean(pagination?.hasNextPage);
   const currentPage = Number(pagination?.currentPage || page || 1);
   const totalPages = Number(pagination?.totalPages || 1);
+
+  const isEditingUpcoming = editingElection?.status === "upcoming";
 
   return (
     <section className="admin-crud aep-page">
@@ -598,7 +805,14 @@ export default function ElectionsPage() {
             ) : elections.length ? (
               <div className="aep-election-grid">
                 {elections.map((election) => (
-                  <ElectionCard key={election._id} election={election} />
+                  <ElectionCard
+                    key={election._id}
+                    election={election}
+                    onEdit={openEditModal}
+                    onTogglePublish={handleTogglePublish}
+                    onDelete={handleDeleteElection}
+                    actionId={actionId}
+                  />
                 ))}
               </div>
             ) : (
@@ -637,6 +851,121 @@ export default function ElectionsPage() {
           </section>
         </div>
       )}
+
+      {editingElection ? (
+        <div className="aep-modal-backdrop" role="presentation">
+          <section className="aep-modal" role="dialog" aria-modal="true">
+            <div className="aep-modal__header">
+              <div>
+                <h3>Edit Election</h3>
+                <p>
+                  {isEditingUpcoming
+                    ? "Upcoming election can be fully edited."
+                    : "Active/ended election allows limited update only."}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="aep-modal__close"
+                onClick={closeEditModal}
+                disabled={updateLoading}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form className="aep-form" onSubmit={handleUpdateElection}>
+              <div className="aep-form-grid">
+                <InputField
+                  label="Election Title"
+                  name="title"
+                  value={editForm.title}
+                  onChange={handleEditChange}
+                  disabled={!isEditingUpcoming}
+                />
+
+                <div className="form-field">
+                  <label className="form-label">Allowed Voter Type</label>
+                  <select
+                    name="allowedVoterType"
+                    value={editForm.allowedVoterType}
+                    onChange={handleEditChange}
+                    className="admin-crud__select"
+                    disabled={!isEditingUpcoming}
+                  >
+                    <option value="verifiedOnly">Verified Only</option>
+                    <option value="all">All Voters</option>
+                  </select>
+                </div>
+
+                <InputField
+                  label="Start Date & Time"
+                  name="startDate"
+                  type="datetime-local"
+                  value={editForm.startDate}
+                  onChange={handleEditChange}
+                  disabled={!isEditingUpcoming}
+                />
+
+                <InputField
+                  label="End Date & Time"
+                  name="endDate"
+                  type="datetime-local"
+                  value={editForm.endDate}
+                  onChange={handleEditChange}
+                  disabled={!isEditingUpcoming}
+                />
+
+                <div className="form-field aep-form-grid__full">
+                  <label className="form-label">Description</label>
+                  <textarea
+                    className="admin-crud__textarea"
+                    name="description"
+                    value={editForm.description}
+                    onChange={handleEditChange}
+                  />
+                </div>
+
+                <label className="aep-switch-card aep-form-grid__full">
+                  <div>
+                    <strong>Published</strong>
+                    <span>
+                      Published elections are visible to eligible voters.
+                    </span>
+                  </div>
+
+                  <input
+                    type="checkbox"
+                    name="isPublished"
+                    checked={editForm.isPublished}
+                    onChange={handleEditChange}
+                  />
+                </label>
+              </div>
+
+              <div className="aep-form-actions">
+                <Button
+                  className="admin-crud__submit"
+                  type="submit"
+                  loading={updateLoading}
+                >
+                  Save Changes
+                </Button>
+
+                <button
+                  type="button"
+                  className="adm-secondary-btn"
+                  onClick={closeEditModal}
+                  disabled={updateLoading}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Briefcase,
   CheckCircle2,
+  Edit3,
   Filter,
   LayoutGrid,
   ListChecks,
@@ -9,8 +10,10 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  Trash2,
   Trophy,
   Vote,
+  X,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import Button from "../../components/common/Button";
@@ -25,6 +28,14 @@ const PAGE_LIMIT = 10;
 
 const initialForm = {
   electionId: "",
+  title: "",
+  description: "",
+  maxVotesPerVoter: 1,
+  displayOrder: 0,
+  isActive: true,
+};
+
+const initialEditForm = {
   title: "",
   description: "",
   maxVotesPerVoter: 1,
@@ -89,7 +100,14 @@ function MetricCard({ icon: Icon, label, value, helper, tone = "green" }) {
   );
 }
 
-function PostCard({ post, elections }) {
+function PostCard({
+  post,
+  elections,
+  actionId,
+  onEdit,
+  onToggleStatus,
+  onDelete,
+}) {
   const electionId =
     post?.electionId?._id || post?.electionId || post?.election?._id || "";
 
@@ -97,6 +115,9 @@ function PostCard({ post, elections }) {
     post?.electionId?.title ||
     post?.election?.title ||
     getElectionTitle(elections, electionId);
+
+  const isActive = post?.isActive !== false;
+  const isBusy = actionId === post?._id;
 
   return (
     <article className="amp-post-card">
@@ -106,7 +127,7 @@ function PostCard({ post, elections }) {
           <p>{post?.description || "No post description added."}</p>
         </div>
 
-        <StatusPill active={post?.isActive !== false} />
+        <StatusPill active={isActive} />
       </div>
 
       <div className="amp-post-card__meta">
@@ -139,6 +160,42 @@ function PostCard({ post, elections }) {
           Created: {formatDateTime(post?.createdAt)}
         </span>
       </div>
+
+      <div className="amp-card-actions">
+        <button
+          type="button"
+          className="amp-action-btn amp-action-btn--edit"
+          onClick={() => onEdit(post)}
+          disabled={isBusy}
+        >
+          <Edit3 size={15} />
+          Edit
+        </button>
+
+        <button
+          type="button"
+          className={
+            isActive
+              ? "amp-action-btn amp-action-btn--warning"
+              : "amp-action-btn amp-action-btn--active"
+          }
+          onClick={() => onToggleStatus(post)}
+          disabled={isBusy}
+        >
+          <ShieldCheck size={15} />
+          {isBusy ? "Updating..." : isActive ? "Deactivate" : "Activate"}
+        </button>
+
+        <button
+          type="button"
+          className="amp-action-btn amp-action-btn--danger"
+          onClick={() => onDelete(post)}
+          disabled={isBusy}
+        >
+          <Trash2 size={15} />
+          Delete
+        </button>
+      </div>
     </article>
   );
 }
@@ -153,11 +210,16 @@ export default function PostsManagementPage() {
 
   const [loading, setLoading] = useState(true);
   const [createLoading, setCreateLoading] = useState(false);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [actionId, setActionId] = useState("");
 
   const [search, setSearch] = useState("");
   const [electionFilter, setElectionFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
+
+  const [editingPost, setEditingPost] = useState(null);
+  const [editForm, setEditForm] = useState(initialEditForm);
 
   const totalCount = Number(pagination?.totalItems || posts.length || 0);
 
@@ -238,18 +300,22 @@ export default function PostsManagementPage() {
     }));
   };
 
-  const validateForm = () => {
-    if (!form.electionId) {
-      toast.error("Please select an election.");
-      return false;
-    }
+  const handleEditChange = (event) => {
+    const { name, value, type, checked } = event.target;
 
-    if (!form.title.trim()) {
+    setEditForm((current) => ({
+      ...current,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const validatePostForm = (targetForm) => {
+    if (!targetForm.title.trim()) {
       toast.error("Post title is required.");
       return false;
     }
 
-    const maxVotes = Number(form.maxVotesPerVoter);
+    const maxVotes = Number(targetForm.maxVotesPerVoter);
 
     if (!Number.isInteger(maxVotes) || maxVotes < 1 || maxVotes > 10) {
       toast.error("Max votes per voter must be between 1 and 10.");
@@ -259,10 +325,19 @@ export default function PostsManagementPage() {
     return true;
   };
 
+  const validateCreateForm = () => {
+    if (!form.electionId) {
+      toast.error("Please select an election.");
+      return false;
+    }
+
+    return validatePostForm(form);
+  };
+
   const handleCreate = async (event) => {
     event.preventDefault();
 
-    if (!validateForm()) return;
+    if (!validateCreateForm()) return;
 
     try {
       setCreateLoading(true);
@@ -289,6 +364,100 @@ export default function PostsManagementPage() {
       toast.error(getApiErrorMessage(error));
     } finally {
       setCreateLoading(false);
+    }
+  };
+
+  const openEditModal = (post) => {
+    setEditingPost(post);
+
+    setEditForm({
+      title: post?.title || "",
+      description: post?.description || "",
+      maxVotesPerVoter: Number(post?.maxVotesPerVoter || 1),
+      displayOrder: Number(post?.displayOrder || 0),
+      isActive: post?.isActive !== false,
+    });
+  };
+
+  const closeEditModal = () => {
+    setEditingPost(null);
+    setEditForm(initialEditForm);
+  };
+
+  const handleUpdatePost = async (event) => {
+    event.preventDefault();
+
+    if (!editingPost?._id) return;
+    if (!validatePostForm(editForm)) return;
+
+    try {
+      setUpdateLoading(true);
+
+      await postService.update(editingPost._id, {
+        title: editForm.title.trim(),
+        description: editForm.description.trim(),
+        maxVotesPerVoter: Number(editForm.maxVotesPerVoter),
+        displayOrder: Number(editForm.displayOrder || 0),
+        isActive: Boolean(editForm.isActive),
+      });
+
+      toast.success("Post updated successfully.");
+      closeEditModal();
+      await loadPosts(page);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  const handleToggleStatus = async (post) => {
+    if (!post?._id) return;
+
+    const nextStatus = post?.isActive === false;
+
+    const shouldContinue = window.confirm(
+      nextStatus ? `Activate "${post.title}"?` : `Deactivate "${post.title}"?`,
+    );
+
+    if (!shouldContinue) return;
+
+    try {
+      setActionId(post._id);
+
+      await postService.update(post._id, {
+        isActive: nextStatus,
+      });
+
+      toast.success(nextStatus ? "Post activated." : "Post deactivated.");
+      await loadPosts(page);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setActionId("");
+    }
+  };
+
+  const handleDeletePost = async (post) => {
+    if (!post?._id) return;
+
+    const shouldDelete = window.confirm(
+      `Delete "${post.title}"? This action cannot be undone.`,
+    );
+
+    if (!shouldDelete) return;
+
+    try {
+      setActionId(post._id);
+
+      await postService.remove(post._id);
+
+      toast.success("Post deleted successfully.");
+      await loadPosts(1);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setActionId("");
     }
   };
 
@@ -641,7 +810,15 @@ export default function PostsManagementPage() {
             ) : posts.length ? (
               <div className="amp-post-grid">
                 {posts.map((post) => (
-                  <PostCard key={post._id} post={post} elections={elections} />
+                  <PostCard
+                    key={post._id}
+                    post={post}
+                    elections={elections}
+                    actionId={actionId}
+                    onEdit={openEditModal}
+                    onToggleStatus={handleToggleStatus}
+                    onDelete={handleDeletePost}
+                  />
                 ))}
               </div>
             ) : (
@@ -680,6 +857,103 @@ export default function PostsManagementPage() {
           </section>
         </div>
       )}
+
+      {editingPost ? (
+        <div className="amp-modal-backdrop" role="presentation">
+          <section className="amp-modal" role="dialog" aria-modal="true">
+            <div className="amp-modal__header">
+              <div>
+                <h3>Edit Post</h3>
+                <p>
+                  Update post title, vote limit, order, status, and summary.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="amp-modal__close"
+                onClick={closeEditModal}
+                disabled={updateLoading}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form className="amp-form" onSubmit={handleUpdatePost}>
+              <div className="amp-form-grid">
+                <InputField
+                  label="Post Title"
+                  name="title"
+                  value={editForm.title}
+                  onChange={handleEditChange}
+                />
+
+                <InputField
+                  label="Max Votes Per Voter"
+                  name="maxVotesPerVoter"
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={editForm.maxVotesPerVoter}
+                  onChange={handleEditChange}
+                />
+
+                <InputField
+                  label="Display Order"
+                  name="displayOrder"
+                  type="number"
+                  min="0"
+                  value={editForm.displayOrder}
+                  onChange={handleEditChange}
+                />
+
+                <label className="amp-switch-card">
+                  <div>
+                    <strong>Post active</strong>
+                    <span>Inactive posts stay hidden from voting.</span>
+                  </div>
+
+                  <input
+                    type="checkbox"
+                    name="isActive"
+                    checked={editForm.isActive}
+                    onChange={handleEditChange}
+                  />
+                </label>
+
+                <div className="form-field amp-form-grid__full">
+                  <label className="form-label">Description</label>
+                  <textarea
+                    className="admin-crud__textarea"
+                    name="description"
+                    value={editForm.description}
+                    onChange={handleEditChange}
+                  />
+                </div>
+              </div>
+
+              <div className="amp-form-actions">
+                <Button
+                  className="admin-crud__submit"
+                  type="submit"
+                  loading={updateLoading}
+                >
+                  Save Changes
+                </Button>
+
+                <button
+                  type="button"
+                  className="adm-secondary-btn"
+                  onClick={closeEditModal}
+                  disabled={updateLoading}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }

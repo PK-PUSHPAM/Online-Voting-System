@@ -1,12 +1,20 @@
 import { motion } from "framer-motion";
-import { ShieldCheck, BarChart3, LockKeyhole, BadgeCheck } from "lucide-react";
+import {
+  BadgeCheck,
+  BarChart3,
+  LockKeyhole,
+  ShieldCheck,
+  Sparkles,
+  UserCheck,
+  Vote,
+} from "lucide-react";
 import PublicNavbar from "./PublicNavbar";
 
 const containerVariants = {
   hidden: {},
   visible: {
     transition: {
-      staggerChildren: 0.12,
+      staggerChildren: 0.1,
     },
   },
 };
@@ -16,6 +24,24 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 };
 
+const highlights = [
+  {
+    icon: LockKeyhole,
+    title: "Secure sessions",
+    text: "Protected role-based access for voters and administrators.",
+  },
+  {
+    icon: UserCheck,
+    title: "Verified voters",
+    text: "Voter approval flow keeps election access controlled.",
+  },
+  {
+    icon: BarChart3,
+    title: "Result analytics",
+    text: "Clean result view with charts and winner summaries.",
+  },
+];
+
 export default function AuthLayout({
   title,
   subtitle,
@@ -23,7 +49,7 @@ export default function AuthLayout({
   children,
 }) {
   return (
-    <div className="auth-shell">
+    <div className="auth-shell auth-shell--light">
       <div className="auth-shell__bg-grid" />
       <div className="auth-shell__glow auth-shell__glow--one" />
       <div className="auth-shell__glow auth-shell__glow--two" />
@@ -38,51 +64,35 @@ export default function AuthLayout({
           animate="visible"
         >
           <motion.div variants={itemVariants} className="hero-badge">
-            <ShieldCheck size={16} />
+            <Sparkles size={16} />
             <span>{badge}</span>
           </motion.div>
 
           <motion.h1 variants={itemVariants}>
-            Build elections that feel
-            <span> trustworthy, premium, and fast.</span>
+            A cleaner way to manage secure online elections.
           </motion.h1>
 
           <motion.p variants={itemVariants}>
-            Role-based dashboards, cookie auth, OTP flows, secure candidate
-            management, clean result reporting, and an interface that does not
-            look like a rushed college project.
+            VoteX brings voter verification, election setup, candidate approval,
+            public chat moderation, and result analytics into one controlled
+            platform.
           </motion.p>
 
-          <motion.div variants={itemVariants} className="hero-metrics">
-            <div className="hero-metric-card" id="security">
-              <div className="hero-metric-card__icon">
-                <LockKeyhole size={20} />
-              </div>
-              <div>
-                <span>Security</span>
-                <strong>Cookie auth + refresh flow</strong>
-              </div>
-            </div>
+          <motion.div variants={itemVariants} className="auth-hero__quick-grid">
+            {highlights.map((item) => {
+              const Icon = item.icon;
 
-            <div className="hero-metric-card" id="roles">
-              <div className="hero-metric-card__icon">
-                <BadgeCheck size={20} />
-              </div>
-              <div>
-                <span>Access Model</span>
-                <strong>Voter, Admin, Super Admin</strong>
-              </div>
-            </div>
+              return (
+                <article key={item.title} className="auth-hero__quick-card">
+                  <div>
+                    <Icon size={19} />
+                  </div>
 
-            <div className="hero-metric-card" id="experience">
-              <div className="hero-metric-card__icon">
-                <BarChart3 size={20} />
-              </div>
-              <div>
-                <span>Experience</span>
-                <strong>Scalable dashboard architecture</strong>
-              </div>
-            </div>
+                  <strong>{item.title}</strong>
+                  <span>{item.text}</span>
+                </article>
+              );
+            })}
           </motion.div>
 
           <motion.div variants={itemVariants} className="hero-preview">
@@ -90,24 +100,48 @@ export default function AuthLayout({
               <span className="dot dot--red" />
               <span className="dot dot--yellow" />
               <span className="dot dot--green" />
+
+              <span className="hero-preview__secure">
+                <ShieldCheck size={13} />
+                Verified access
+              </span>
             </div>
 
             <div className="hero-preview__body">
               <div className="hero-preview__sidebar">
-                <div className="preview-block preview-block--lg" />
+                <div className="hero-preview__brand">
+                  <Vote size={17} />
+                  <span>VoteX</span>
+                </div>
+
+                <div className="preview-block preview-block--active" />
                 <div className="preview-block" />
-                <div className="preview-block" />
+                <div className="preview-block preview-block--short" />
                 <div className="preview-block" />
               </div>
 
               <div className="hero-preview__main">
                 <div className="preview-stat-row">
-                  <div className="preview-stat" />
+                  <div className="preview-stat">
+                    <BadgeCheck size={16} />
+                  </div>
                   <div className="preview-stat" />
                   <div className="preview-stat" />
                 </div>
-                <div className="preview-chart" />
-                <div className="preview-table" />
+
+                <div className="preview-chart">
+                  <span style={{ height: "48%" }} />
+                  <span style={{ height: "74%" }} />
+                  <span style={{ height: "58%" }} />
+                  <span style={{ height: "86%" }} />
+                  <span style={{ height: "62%" }} />
+                </div>
+
+                <div className="preview-table">
+                  <div />
+                  <div />
+                  <div />
+                </div>
               </div>
             </div>
           </motion.div>
@@ -120,7 +154,11 @@ export default function AuthLayout({
           transition={{ duration: 0.45 }}
         >
           <div className="auth-card__header">
-            <p className="auth-card__eyebrow">{badge}</p>
+            <p className="auth-card__eyebrow">
+              <ShieldCheck size={14} />
+              {badge}
+            </p>
+
             <h2>{title}</h2>
             <p>{subtitle}</p>
           </div>

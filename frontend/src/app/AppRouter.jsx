@@ -1,4 +1,6 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
+import HomePage from "../pages/public/HomePage";
+import DemoShowcasePage from "../pages/public/DemoShowcasePage";
 import LoginPage from "../pages/auth/LoginPage";
 import RegisterPage from "../pages/auth/RegisterPage";
 import OtpLoginPage from "../pages/auth/OtpLoginPage";
@@ -10,7 +12,6 @@ import ProtectedRoute from "../routes/ProtectedRoute";
 import RoleRoute from "../routes/RoleRoute";
 
 import { APP_ROUTES } from "../lib/routes";
-import { useAuth } from "../hooks/useAuth";
 
 import AdminDashboardPage from "../pages/admin/AdminDashboardPage";
 import ElectionsPage from "../pages/admin/ElectionsPage";
@@ -26,35 +27,15 @@ import VoterElectionsPage from "../pages/voter/VoterElectionsPage";
 import VoterMyVotesPage from "../pages/voter/VoterMyVotesPage";
 import VoterProfilePage from "../pages/voter/VoterProfilePage";
 import VoterElectionDetailsPage from "../pages/voter/VoterElectionDetailsPage";
-import VoterResultsPage from "../pages/voter/VoterResultsPage";
 
 import DashboardLayout from "../components/layout/DashboardLayout";
 import VoterLayout from "../components/layout/VoterLayout";
 
-function HomeRedirect() {
-  const { user, isBootstrapping } = useAuth();
-
-  if (isBootstrapping) return null;
-
-  if (!user) return <Navigate to={APP_ROUTES.LOGIN} replace />;
-
-  const normalizedRole = String(user?.role || "").toLowerCase();
-
-  if (
-    normalizedRole === "admin" ||
-    normalizedRole === "super_admin" ||
-    normalizedRole === "superadmin"
-  ) {
-    return <Navigate to={APP_ROUTES.ADMIN_DASHBOARD} replace />;
-  }
-
-  return <Navigate to={APP_ROUTES.VOTER_DASHBOARD} replace />;
-}
-
 export default function AppRouter() {
   return (
     <Routes>
-      <Route path={APP_ROUTES.HOME} element={<HomeRedirect />} />
+      <Route path={APP_ROUTES.HOME} element={<HomePage />} />
+      <Route path="/demo" element={<DemoShowcasePage />} />
 
       <Route path={APP_ROUTES.LOGIN} element={<LoginPage />} />
       <Route path={APP_ROUTES.REGISTER} element={<RegisterPage />} />
@@ -99,7 +80,6 @@ export default function AppRouter() {
               element={<VoterElectionDetailsPage />}
             />
             <Route path="my-votes" element={<VoterMyVotesPage />} />
-            <Route path="results" element={<VoterResultsPage />} />
             <Route path="profile" element={<VoterProfilePage />} />
           </Route>
         </Route>
